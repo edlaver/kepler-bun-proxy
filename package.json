@@ -1,0 +1,21 @@
+{
+  "name": "kepler-bun-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "bun build src/index.ts --compile --outfile dist/kepler-bun-proxy && node -e \"require('fs').copyFileSync('config.json','dist/config.json')\""
+  },
+  "dependencies": {
+    "hono": "^4.8.2",
+    "js-tiktoken": "^1.0.21",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.19",
+    "typescript": "^5.8.2"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "convertToken": false,
+  "tokenEndpoint": "https://your-gateway.com/token",
+  "debugPath": "./logs",
+  "providers": {
+    "openai": {
+      "routePrefix": "/openai",
+      "upstreamTemplate": "https://your-gateway.com/genai/oai/{model}/v1",
+      "defaultModel": "gpt-5.1-2025-11-13",
+      "disableStreaming": true,
+      "tokenLimitPerMinute": 20000,
+      "stripRequestProperties": ["max_tokens"],
+      "modelAliases": {
+        "gpt-5.1": "gpt-5.1-2025-11-13"
+      }
+    }
+  }
+}

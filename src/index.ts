@@ -20,13 +20,14 @@ interface PreparedRequestBody {
 }
 
 const configStore = await ConfigStore.create(process.cwd());
+const debugEnabled = getDebugFlag(Bun.argv);
 const tokenCounter = new TokenCounter();
 const tokenRateLimiter = new TokenRateLimiter();
 const tokenService = new TokenService(
   () => configStore.getConfig().proxy.tokenEndpoint,
 );
-const debugLogger = new DebugLogger(
-  () => configStore.getConfig().proxy.debugPath,
+const debugLogger = new DebugLogger(() =>
+  debugEnabled ? configStore.getConfig().proxy.debugPath : undefined,
 );
 
 const app = new Hono();
@@ -371,4 +372,36 @@ function shouldIncludeBody(method: string, body: Uint8Array): boolean {
     return false;
   }
   return body.byteLength > 0;
+}
+
+function getDebugFlag(argv: string[]): boolean {
+  let enabled = false;
+
+  for (const arg of argv.slice(2)) {
+    if (arg === "--debug" || arg === "-d") {
+      enabled = true;
+      continue;
+    }
+
+    if (arg.startsWith("--debug=")) {
+      const value = arg.slice("--debug=".length);
+      const parsed = parseBooleanFlag(value);
+      if (parsed !== undefined) {
+        enabled = parsed;
+      }
+    }
+  }
+
+  return enabled;
+}
+
+function parseBooleanFlag(value: string): boolean | undefined {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true" || normalized === "1" || normalized === "yes") {
+    return true;
+  }
+  if (normalized === "false" || normalized === "0" || normalized === "no") {
+    return false;
+  }
+  return undefined;
 }

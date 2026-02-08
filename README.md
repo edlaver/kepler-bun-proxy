@@ -21,7 +21,7 @@ Config is a single, top-level object (no `Proxy` wrapper). Key highlights:
 
 - `convertToken` (boolean)
 - `tokenEndpoint` (string)
-- `debugPath` (string, optional)
+- `debugPath` (string, optional; used only when `--debug`/`-d` is provided)
 - `providers` (record of providers)
 - Provider settings include `routePrefix`, `upstreamTemplate`, `defaultModel`,
   `modelAliases`, `disableStreaming`, `tokenLimitPerMinute`,
@@ -31,5 +31,6 @@ Config is a single, top-level object (no `Proxy` wrapper). Key highlights:
 
 - `bun run dev`
 - `bun run start`
+- `bun run start -- --debug` (enables request/response Markdown logging when `debugPath` is set)
 - `bun run build` (builds a single-file executable and copies `config.json` to `dist/config.json`)
 - `bun run typecheck`

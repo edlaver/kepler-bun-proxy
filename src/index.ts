@@ -1,3 +1,4 @@
+import path from "node:path";
 import { parseArgs } from "util";
 import { Hono } from "hono";
 import { proxy } from "hono/proxy";
@@ -164,6 +165,14 @@ const server = Bun.serve({
 console.info(
   `Proxy listening on http://${server.hostname}:${server.port} (${bootConfig.environmentName})`,
 );
+
+const debugPath = debugEnabled ? bootConfig.proxy.debugPath : undefined;
+if (debugEnabled && debugPath) {
+  const fullDebugPath = path.resolve(process.cwd(), debugPath);
+  console.info(`Debug logging: enabled (${fullDebugPath})`);
+} else {
+  console.info("Debug logging: disabled");
+}
 
 function resolveProvider(
   providers: Record<string, ProviderConfig>,

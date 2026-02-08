@@ -1,3 +1,4 @@
+import { parseArgs } from "util";
 import { Hono } from "hono";
 import { proxy } from "hono/proxy";
 import { ConfigStore } from "./config-store";
@@ -20,7 +21,7 @@ interface PreparedRequestBody {
 }
 
 const configStore = await ConfigStore.create(process.cwd());
-const debugEnabled = getDebugFlag(Bun.argv);
+const debugEnabled = getDebugFlag();
 const tokenCounter = new TokenCounter();
 const tokenRateLimiter = new TokenRateLimiter();
 const tokenService = new TokenService(
@@ -374,16 +375,17 @@ function shouldIncludeBody(method: string, body: Uint8Array): boolean {
   return body.byteLength > 0;
 }
 
-function getDebugFlag(argv: string[]): boolean {
-  const { values } = Bun.parseArgs({
-    args: argv.slice(2),
+function getDebugFlag(): boolean {
+  const { values } = parseArgs({
+    args: Bun.argv,
     options: {
       debug: {
         type: "boolean",
         short: "d",
       },
     },
-    strict: false,
+    strict: true,
+    allowPositionals: true,
   });
 
   return Boolean(values.debug);

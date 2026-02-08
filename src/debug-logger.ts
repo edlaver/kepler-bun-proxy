@@ -38,7 +38,13 @@ export class DebugLogger {
     }
 
     const lines: string[] = [];
-    lines.push("# Request", "", `**Method**: ${input.method}`, `**Uri**: ${input.uri}`, "");
+    lines.push(
+      "# Request",
+      "",
+      `**Method**: ${input.method}`,
+      `**Uri**: ${input.uri}`,
+      "",
+    );
     appendHeadersTable(lines, input.headers);
 
     if (input.body && input.body.length > 0) {
@@ -73,8 +79,12 @@ export class DebugLogger {
 
   private prettyPrintPayload(payload: Uint8Array): string {
     const rawText = this.textDecoder.decode(payload);
+    const normalized = rawText.replace(/^\uFEFF/, "").trim();
+    if (!normalized) {
+      return rawText;
+    }
     try {
-      return JSON.stringify(JSON.parse(rawText), null, 2);
+      return JSON.stringify(JSON.parse(normalized), null, 2);
     } catch {
       return rawText;
     }

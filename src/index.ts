@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { proxy } from "hono/proxy";
 import { ConfigStore } from "./config-store";
 import { DebugLogger } from "./debug-logger";
 import { TokenCounter } from "./token-counter";
@@ -114,7 +115,7 @@ app.all("*", async (c) => {
       });
     }
 
-    const response = await fetch(upstreamUrl, {
+    const response = await proxy(upstreamUrl, {
       method: request.method,
       headers,
       body,
@@ -126,7 +127,7 @@ app.all("*", async (c) => {
       return response;
     }
 
-    const responseBody = new Uint8Array(await response.arrayBuffer());
+    const responseBody = new Uint8Array(await response.clone().arrayBuffer());
     await debugLogger.logResponse({
       status: response.status,
       statusText: response.statusText,
@@ -135,11 +136,7 @@ app.all("*", async (c) => {
       body: responseBody,
     });
 
-    return new Response(responseBody, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: new Headers(response.headers),
-    });
+    return response;
   };
 
   if (!proxyConfig.convertToken || !originalAuth) {

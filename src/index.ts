@@ -375,33 +375,16 @@ function shouldIncludeBody(method: string, body: Uint8Array): boolean {
 }
 
 function getDebugFlag(argv: string[]): boolean {
-  let enabled = false;
+  const { values } = Bun.parseArgs({
+    args: argv.slice(2),
+    options: {
+      debug: {
+        type: "boolean",
+        short: "d",
+      },
+    },
+    strict: false,
+  });
 
-  for (const arg of argv.slice(2)) {
-    if (arg === "--debug" || arg === "-d") {
-      enabled = true;
-      continue;
-    }
-
-    if (arg.startsWith("--debug=")) {
-      const value = arg.slice("--debug=".length);
-      const parsed = parseBooleanFlag(value);
-      if (parsed !== undefined) {
-        enabled = parsed;
-      }
-    }
-  }
-
-  return enabled;
-}
-
-function parseBooleanFlag(value: string): boolean | undefined {
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "true" || normalized === "1" || normalized === "yes") {
-    return true;
-  }
-  if (normalized === "false" || normalized === "0" || normalized === "no") {
-    return false;
-  }
-  return undefined;
+  return Boolean(values.debug);
 }

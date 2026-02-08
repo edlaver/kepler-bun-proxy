@@ -1,6 +1,6 @@
 # kepler-bun-proxy
 
-TypeScript/Bun/Hono reverse proxy port of the original .NET YARP service.
+TypeScript/Bun/Hono reverse proxy that forwards standard OpenAI requests to the Kepler AI API gateway provider in the expected URL format, with token handling, rate limiting, and optional debug logging.
 
 ## Run
 

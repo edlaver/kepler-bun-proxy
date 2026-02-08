@@ -110,8 +110,49 @@ function appendHeadersTable(lines: string[], headers: Headers): void {
   lines.push("| Header | Value |", "| --- | --- |");
 
   for (const [key, value] of headers.entries()) {
-    lines.push(`| ${key} | ${value} |`);
+    const normalizedKey = key.toLowerCase();
+    const displayValue =
+      normalizedKey === "authorization" ? maskAuthorizationValue(value) : value;
+    lines.push(`| ${key} | ${displayValue} |`);
   }
+}
+
+function maskAuthorizationValue(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return value;
+  }
+
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) {
+    return maskToken(parts[0]);
+  }
+
+  const [scheme, ...rest] = parts;
+  const token = rest.join(" ");
+  const maskedToken = maskToken(token);
+  if (scheme.toLowerCase() === "bearer") {
+    return `Bearer ${maskedToken}`;
+  }
+
+  return `${scheme} ${maskedToken}`;
+}
+
+function maskToken(token: string): string {
+  const trimmed = token.trim();
+  if (!trimmed) {
+    return token;
+  }
+
+  if (trimmed.length <= 4) {
+    return `${trimmed.slice(0, 1)}...${trimmed.slice(-1)}`;
+  }
+
+  if (trimmed.length <= 8) {
+    return `${trimmed.slice(0, 2)}...${trimmed.slice(-2)}`;
+  }
+
+  return `${trimmed.slice(0, 4)}...${trimmed.slice(-3)}`;
 }
 
 function formatTimestamp(date: Date): string {

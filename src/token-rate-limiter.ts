@@ -70,7 +70,6 @@ export class TokenRateLimiter {
     }
 
     this.trackActiveKey(normalizedKey);
-    this.emitStatus(normalizedKey, bucket, true);
   }
 
   private getOrCreateBucket(key: string, limitPerMinute: number): Bucket {

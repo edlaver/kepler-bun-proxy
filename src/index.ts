@@ -25,8 +25,6 @@ const configStore = await ConfigStore.create(process.cwd());
 const debugEnabled = getDebugFlag();
 const tokenCounter = new TokenCounter();
 const tokenRateLimiter = new TokenRateLimiter();
-const initialConfig = configStore.getConfig();
-registerProviderLimits(tokenRateLimiter, initialConfig.proxy.providers);
 const tokenService = new TokenService(
   () => configStore.getConfig().proxy.tokenEndpoint,
 );
@@ -175,6 +173,9 @@ if (debugEnabled && debugPath) {
 } else {
   console.info("Debug logging: disabled");
 }
+
+const initialConfig = configStore.getConfig();
+registerProviderLimits(tokenRateLimiter, initialConfig.proxy.providers);
 
 function resolveProvider(
   providers: Record<string, ProviderConfig>,

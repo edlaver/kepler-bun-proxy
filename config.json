@@ -5,14 +5,16 @@
   "providers": {
     "openai": {
       "routePrefix": "/openai",
-      "upstreamTemplate-example": "https://your-gateway.com/genai/oai/{model}/v1",
+      "upstreamTemplate-example": "https://your-gateway.com/genai/oai/{model}",
       "upstreamTemplate": "https://api.openai.com",
       "defaultModel": "gpt-5.1-2025-11-13",
       "disableStreaming": true,
       "tokenLimitPerMinute": 200000,
       "stripRequestProperties": ["max_tokens"],
-      "modelAliases": {
-        "gpt-5.1": "gpt-5.1-2025-11-13"
+      "models": {
+        "gpt-5.1-2025-11-13": {
+          "modelAlias": "gpt-5.1"
+        }
       }
     }
   }

@@ -37,6 +37,41 @@ const debugLogger = new DebugLogger(() =>
 
 const app = new Hono();
 
+app.get("*", async (c, next) => {
+  const requestUrl = new URL(c.req.raw.url);
+  const pathname = requestUrl.pathname;
+
+  if (!pathname.toLowerCase().endsWith("/v1/models")) {
+    await next();
+    return;
+  }
+
+  const proxyConfig = configStore.getConfig().proxy;
+  const providerMatch = resolveProvider(proxyConfig.providers, pathname);
+  if (!providerMatch) {
+    await next();
+    return;
+  }
+
+  const pathWithoutPrefix = removePrefix(
+    pathname,
+    providerMatch.provider.routePrefix,
+  );
+  if (pathWithoutPrefix.toLowerCase() !== "/v1/models") {
+    await next();
+    return;
+  }
+
+  const data = buildModelList(providerMatch.provider).map((id) => ({
+    id,
+    object: "model",
+    created: 0,
+    owned_by: providerMatch.name,
+  }));
+
+  return c.json({ object: "list", data });
+});
+
 app.all("*", async (c) => {
   const config = configStore.getConfig();
   const proxyConfig = config.proxy;
@@ -287,7 +322,7 @@ async function prepareRequestBody(
     typeof parsed.model === "string" ? parsed.model : undefined;
   let resolvedModel = currentModel?.trim() || provider.defaultModel;
   if (resolvedModel) {
-    const aliasTarget = provider.modelAliases[resolvedModel.toLowerCase()];
+    const aliasTarget = provider.modelAliasLookup[resolvedModel.toLowerCase()];
     if (aliasTarget) {
       resolvedModel = aliasTarget;
     }
@@ -396,6 +431,27 @@ function joinPath(basePath: string, suffixPath: string): string {
     : `/${suffixPath}`;
 
   return `${normalizedBase}${normalizedSuffix}`.replace(/\/{2,}/g, "/");
+}
+
+function buildModelList(provider: ProviderConfig): string[] {
+  const items: string[] = [];
+  const seen = new Set<string>();
+
+  for (const [modelName, modelConfig] of Object.entries(provider.models)) {
+    const trimmedName = modelName.trim();
+    if (trimmedName && !seen.has(trimmedName)) {
+      items.push(trimmedName);
+      seen.add(trimmedName);
+    }
+
+    const alias = modelConfig.modelAlias?.trim();
+    if (alias && !seen.has(alias)) {
+      items.push(alias);
+      seen.add(alias);
+    }
+  }
+
+  return items;
 }
 
 function normalizePath(value: string): string {

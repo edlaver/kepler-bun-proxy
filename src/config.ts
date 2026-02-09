@@ -1,16 +1,25 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import type { AppConfig, ProviderConfig, ProxyConfig } from "./types";
+import type {
+  AppConfig,
+  ProviderConfig,
+  ProviderModelConfig,
+  ProxyConfig,
+} from "./types";
 
 const DEFAULT_TOKEN_ENDPOINT =
   "https://nwgateway-appdev.kepler-prod.shared.banksvcs.net/token";
+
+const providerModelSchema = z.object({
+  modelAlias: z.string().optional().default(""),
+});
 
 const providerSchema = z.object({
   routePrefix: z.string().default(""),
   upstreamTemplate: z.string().default(""),
   defaultModel: z.string().default(""),
-  modelAliases: z.record(z.string()).default({}),
+  models: z.record(providerModelSchema).default({}),
   disableStreaming: z.boolean().default(false),
   stripRequestProperties: z.array(z.string()).default([]),
   tokenLimitPerMinute: z.number().int().nonnegative().default(0),
@@ -58,21 +67,33 @@ function mapProxyConfig(source: z.infer<typeof proxySchema>): ProxyConfig {
       continue;
     }
 
-    const aliases: Record<string, string> = {};
-    for (const [alias, target] of Object.entries(provider.modelAliases)) {
-      const normalizedAlias = alias.trim().toLowerCase();
-      const normalizedTarget = target.trim();
-      if (!normalizedAlias || !normalizedTarget) {
+    const models: Record<string, ProviderModelConfig> = {};
+    const modelAliasLookup: Record<string, string> = {};
+    for (const [modelNameRaw, modelConfig] of Object.entries(provider.models)) {
+      const modelName = modelNameRaw.trim();
+      if (!modelName) {
         continue;
       }
-      aliases[normalizedAlias] = normalizedTarget;
+
+      const aliasRaw = modelConfig.modelAlias?.trim() ?? "";
+      const alias = aliasRaw.length > 0 ? aliasRaw : undefined;
+
+      models[modelName] = alias ? { modelAlias: alias } : {};
+
+      if (alias) {
+        const normalizedAlias = alias.toLowerCase();
+        if (normalizedAlias && normalizedAlias !== modelName.toLowerCase()) {
+          modelAliasLookup[normalizedAlias] = modelName;
+        }
+      }
     }
 
     providers[providerName] = {
       routePrefix: normalizeRoutePrefix(provider.routePrefix),
       upstreamTemplate: provider.upstreamTemplate.trim(),
       defaultModel: provider.defaultModel.trim(),
-      modelAliases: aliases,
+      models,
+      modelAliasLookup,
       disableStreaming: provider.disableStreaming,
       stripRequestProperties: provider.stripRequestProperties
         .map((property) => property.trim())

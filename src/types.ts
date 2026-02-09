@@ -2,10 +2,15 @@ export interface ProviderConfig {
   routePrefix: string;
   upstreamTemplate: string;
   defaultModel: string;
-  modelAliases: Record<string, string>;
+  models: Record<string, ProviderModelConfig>;
+  modelAliasLookup: Record<string, string>;
   disableStreaming: boolean;
   stripRequestProperties: string[];
   tokenLimitPerMinute: number;
+}
+
+export interface ProviderModelConfig {
+  modelAlias?: string;
 }
 
 export interface ProxyConfig {

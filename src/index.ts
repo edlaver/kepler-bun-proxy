@@ -5,7 +5,10 @@ import { proxy } from "hono/proxy";
 import { ConfigStore } from "./config-store";
 import { DebugLogger } from "./debug-logger";
 import { TokenCounter } from "./token-counter";
-import { TokenRateLimiter } from "./token-rate-limiter";
+import {
+  TokenRateLimiter,
+  type TokenLimitSnapshot,
+} from "./token-rate-limiter";
 import { TokenService } from "./token-service";
 import type { ProviderConfig } from "./types";
 
@@ -53,17 +56,21 @@ app.all("*", async (c) => {
     requestUrl.pathname,
   );
 
-  if (
-    providerMatch.provider.tokenLimitPerMinute > 0 &&
-    preparedBody.payloadForTokenCount
-  ) {
-    const tokens = tokenCounter.countTokens(preparedBody.payloadForTokenCount);
-    await tokenRateLimiter.waitForTokens(
-      providerMatch.name,
-      providerMatch.provider.tokenLimitPerMinute,
-      tokens,
-      request.signal,
-    );
+  let tokenLimitSnapshot: TokenLimitSnapshot | null = null;
+  if (providerMatch.provider.tokenLimitPerMinute > 0) {
+    if (preparedBody.payloadForTokenCount) {
+      const tokens = tokenCounter.countTokens(
+        preparedBody.payloadForTokenCount,
+      );
+      await tokenRateLimiter.waitForTokens(
+        providerMatch.name,
+        providerMatch.provider.tokenLimitPerMinute,
+        tokens,
+        request.signal,
+      );
+    }
+
+    tokenLimitSnapshot = tokenRateLimiter.getUsageSnapshot(providerMatch.name);
   }
 
   const model =
@@ -105,6 +112,8 @@ app.all("*", async (c) => {
       }
     }
 
+    setTokenLimitHeaders(headers, tokenLimitSnapshot);
+
     const body = shouldIncludeBody(request.method, preparedBody.forwardBody)
       ? new Uint8Array(preparedBody.forwardBody)
       : undefined;
@@ -126,20 +135,27 @@ app.all("*", async (c) => {
       signal: request.signal,
     });
 
+    const enrichedResponse = withTokenLimitHeaders(
+      response,
+      tokenLimitSnapshot,
+    );
+
     if (!debugLogger.isEnabled()) {
-      return response;
+      return enrichedResponse;
     }
 
-    const responseBody = new Uint8Array(await response.clone().arrayBuffer());
+    const responseBody = new Uint8Array(
+      await enrichedResponse.clone().arrayBuffer(),
+    );
     await debugLogger.logResponse({
-      status: response.status,
-      statusText: response.statusText,
+      status: enrichedResponse.status,
+      statusText: enrichedResponse.statusText,
       uri: upstreamUrl,
-      headers: response.headers,
+      headers: enrichedResponse.headers,
       body: responseBody,
     });
 
-    return response;
+    return enrichedResponse;
   };
 
   if (!proxyConfig.convertToken || !originalAuth) {
@@ -396,6 +412,39 @@ function shouldIncludeBody(method: string, body: Uint8Array): boolean {
     return false;
   }
   return body.byteLength > 0;
+}
+
+function setTokenLimitHeaders(
+  headers: Headers,
+  snapshot: TokenLimitSnapshot | null,
+): void {
+  if (!snapshot) {
+    return;
+  }
+
+  headers.set("x-token-limit-per-minute-used", snapshot.used.toString());
+  headers.set(
+    "x-token-limit-per-minute-available",
+    snapshot.available.toString(),
+  );
+}
+
+function withTokenLimitHeaders(
+  response: Response,
+  snapshot: TokenLimitSnapshot | null,
+): Response {
+  if (!snapshot) {
+    return response;
+  }
+
+  const headers = new Headers(response.headers);
+  setTokenLimitHeaders(headers, snapshot);
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 function getDebugFlag(): boolean {

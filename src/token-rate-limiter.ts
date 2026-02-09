@@ -12,6 +12,12 @@ interface UsageSample {
   tokens: number;
 }
 
+export interface TokenLimitSnapshot {
+  used: number;
+  available: number;
+  limit: number;
+}
+
 export class TokenRateLimiter {
   private readonly buckets = new Map<string, Bucket>();
   private readonly activeKeys = new Set<string>();
@@ -70,6 +76,23 @@ export class TokenRateLimiter {
     }
 
     this.trackActiveKey(normalizedKey);
+  }
+
+  getUsageSnapshot(key: string): TokenLimitSnapshot | null {
+    const normalizedKey = key.toLowerCase();
+    const bucket = this.buckets.get(normalizedKey);
+    if (!bucket) {
+      return null;
+    }
+
+    const now = Date.now();
+    this.pruneUsageWindow(bucket, now);
+
+    const used = Math.max(0, Math.round(bucket.usedInWindow));
+    const limit = Math.max(0, Math.round(bucket.capacity));
+    const available = Math.max(0, limit - used);
+
+    return { used, available, limit };
   }
 
   private getOrCreateBucket(key: string, limitPerMinute: number): Bucket {
@@ -170,6 +193,9 @@ export class TokenRateLimiter {
     const cutoff = now - 60_000;
     while (bucket.usageWindow.length > 0) {
       const sample = bucket.usageWindow[0];
+      if (!sample) {
+        break;
+      }
       if (sample.atUnixMs >= cutoff) {
         break;
       }

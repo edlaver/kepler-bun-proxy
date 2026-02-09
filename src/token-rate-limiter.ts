@@ -151,7 +151,7 @@ export class TokenRateLimiter {
       }
 
       this.refillBucket(bucket);
-      this.emitStatus(key, bucket, false);
+      this.emitStatus(key, bucket, true);
     }
   }
 

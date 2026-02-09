@@ -25,6 +25,8 @@ const configStore = await ConfigStore.create(process.cwd());
 const debugEnabled = getDebugFlag();
 const tokenCounter = new TokenCounter();
 const tokenRateLimiter = new TokenRateLimiter();
+const initialConfig = configStore.getConfig();
+registerProviderLimits(tokenRateLimiter, initialConfig.proxy.providers);
 const tokenService = new TokenService(
   () => configStore.getConfig().proxy.tokenEndpoint,
 );
@@ -197,6 +199,17 @@ function resolveProvider(
   }
 
   return match;
+}
+
+function registerProviderLimits(
+  rateLimiter: TokenRateLimiter,
+  providers: Record<string, ProviderConfig>,
+): void {
+  for (const [name, provider] of Object.entries(providers)) {
+    if (provider.tokenLimitPerMinute > 0) {
+      rateLimiter.registerLimit(name, provider.tokenLimitPerMinute);
+    }
+  }
 }
 
 function startsWithRoutePrefix(pathname: string, routePrefix: string): boolean {

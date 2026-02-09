@@ -7,8 +7,8 @@
     "dev": "bun --watch src/index.ts",
     "start": "bun run src/index.ts",
     "typecheck": "tsc --noEmit",
-    "build": "bun build src/index.ts --compile --outfile dist/kepler-bun-proxy && node -e \"require('fs').copyFileSync('config.json','dist/config.json')\"",
-    "clear:logs": "node -e \"const fs=require('fs');const path=require('path');const cfg=JSON.parse(fs.readFileSync('config.json','utf8'));const debugPath=path.resolve(cfg.debugPath||'./logs');if(!fs.existsSync(debugPath))fs.mkdirSync(debugPath,{recursive:true});for(const entry of fs.readdirSync(debugPath)){fs.rmSync(path.join(debugPath,entry),{recursive:true,force:true});}\""
+    "build": "bun build src/index.ts --compile --outfile dist/kepler-bun-proxy && bun -e \"import { copyFileSync } from 'node:fs'; copyFileSync('config.json', 'dist/config.json');\"",
+    "clear:logs": "bun -e \"import { existsSync, mkdirSync, readdirSync, rmSync, readFileSync } from 'node:fs'; import { join, resolve } from 'node:path'; const cfg = JSON.parse(readFileSync('config.json', 'utf8')); const debugPath = resolve(cfg.debugPath || './logs'); if (!existsSync(debugPath)) mkdirSync(debugPath, { recursive: true }); for (const entry of readdirSync(debugPath)) rmSync(join(debugPath, entry), { recursive: true, force: true });\""
   },
   "dependencies": {
     "hono": "^4.11.9",

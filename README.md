@@ -4,6 +4,8 @@ TypeScript/Bun/Hono reverse proxy that forwards standard OpenAI requests to the 
 
 ## Run
 
+Copy config.example.json to config.json and update with your provider details before running.
+
 ```bash
 bun install
 bun run start

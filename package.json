@@ -7,7 +7,8 @@
     "dev": "bun --watch src/index.ts",
     "start": "bun run src/index.ts",
     "typecheck": "tsc --noEmit",
-    "build": "bun build src/index.ts --compile --outfile dist/kepler-bun-proxy && node -e \"require('fs').copyFileSync('config.json','dist/config.json')\""
+    "build": "bun build src/index.ts --compile --outfile dist/kepler-bun-proxy && node -e \"require('fs').copyFileSync('config.json','dist/config.json')\"",
+    "clear:logs": "node -e \"const fs=require('fs');const path=require('path');const cfg=JSON.parse(fs.readFileSync('config.json','utf8'));const debugPath=path.resolve(cfg.debugPath||'./logs');if(!fs.existsSync(debugPath))fs.mkdirSync(debugPath,{recursive:true});for(const entry of fs.readdirSync(debugPath)){fs.rmSync(path.join(debugPath,entry),{recursive:true,force:true});}\""
   },
   "dependencies": {
     "hono": "^4.11.9",

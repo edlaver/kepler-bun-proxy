@@ -18,6 +18,13 @@ export interface TokenLimitSnapshot {
   limit: number;
 }
 
+export interface InternalTokenRateLimitEvent {
+  providerKey: string;
+  requiredTokens: number;
+  availableTokens: number;
+  limitPerMinute: number;
+}
+
 export class TokenRateLimiter {
   private readonly buckets = new Map<string, Bucket>();
   private readonly activeKeys = new Set<string>();
@@ -26,6 +33,12 @@ export class TokenRateLimiter {
   private readonly statusIntervalMs = 250;
   private readonly statusTickMs = 1000;
   private statusTimer: ReturnType<typeof setInterval> | undefined;
+
+  constructor(
+    private readonly onInternalTokenRateLimited?: (
+      event: InternalTokenRateLimitEvent,
+    ) => void | Promise<void>,
+  ) {}
 
   async waitForTokens(
     key: string,
@@ -44,6 +57,7 @@ export class TokenRateLimiter {
     const normalizedKey = key.toLowerCase();
     const bucket = this.getOrCreateBucket(normalizedKey, limitPerMinute);
     this.trackActiveKey(normalizedKey);
+    let internalLimitLogged = false;
 
     while (true) {
       this.refillBucket(bucket);
@@ -58,6 +72,25 @@ export class TokenRateLimiter {
       const deficit = tokens - bucket.available;
       const delaySeconds = deficit / bucket.refillRatePerSecond;
       const delayMs = Math.max(10, Math.ceil(delaySeconds * 1000));
+
+      if (!internalLimitLogged) {
+        const event: InternalTokenRateLimitEvent = {
+          providerKey: normalizedKey,
+          requiredTokens: Math.round(tokens),
+          availableTokens: Math.max(0, Math.floor(bucket.available)),
+          limitPerMinute: Math.round(bucket.capacity),
+        };
+        console.warn(
+          `[RateLimit/InternalTokens] Delaying request for provider "${event.providerKey}" due to internal token budget (required=${event.requiredTokens}, available=${event.availableTokens}, limitPerMinute=${event.limitPerMinute}).`,
+        );
+
+        if (this.onInternalTokenRateLimited) {
+          await Promise.resolve(this.onInternalTokenRateLimited(event));
+        }
+
+        internalLimitLogged = true;
+      }
+
       await sleep(delayMs, signal);
     }
   }

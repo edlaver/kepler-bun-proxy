@@ -6,6 +6,7 @@ import { ConfigStore } from "./config-store";
 import { DebugLogger } from "./debug-logger";
 import { TokenCounter } from "./token-counter";
 import {
+  type InternalTokenRateLimitEvent,
   TokenRateLimiter,
   type TokenLimitSnapshot,
 } from "./token-rate-limiter";
@@ -27,12 +28,28 @@ interface PreparedRequestBody {
 const configStore = await ConfigStore.create(process.cwd());
 const debugEnabled = getDebugFlag();
 const tokenCounter = new TokenCounter();
-const tokenRateLimiter = new TokenRateLimiter();
-const tokenService = new TokenService(
-  () => configStore.getConfig().proxy.tokenEndpoint,
-);
 const debugLogger = new DebugLogger(() =>
   debugEnabled ? configStore.getConfig().proxy.debugPath : undefined,
+);
+const tokenRateLimiter = new TokenRateLimiter(
+  async (event: InternalTokenRateLimitEvent) => {
+    if (!debugLogger.isEnabled()) {
+      return;
+    }
+
+    await debugLogger.logEvent({
+      title: "RateLimit/InternalTokens",
+      details: [
+        `Provider: ${event.providerKey}`,
+        `Required tokens: ${event.requiredTokens}`,
+        `Available tokens: ${event.availableTokens}`,
+        `Limit per minute: ${event.limitPerMinute}`,
+      ],
+    });
+  },
+);
+const tokenService = new TokenService(
+  () => configStore.getConfig().proxy.tokenEndpoint,
 );
 
 const app = new Hono();
@@ -172,6 +189,22 @@ app.all("*", async (c) => {
       redirect: "manual",
       signal: request.signal,
     });
+
+    if (response.status === 429) {
+      const message = `[RateLimit/Upstream429] Upstream rate limit response received for provider "${providerMatch.name}" (${request.method} ${upstreamUrl}).`;
+      console.warn(message);
+
+      if (debugLogger.isEnabled()) {
+        await debugLogger.logEvent({
+          title: "RateLimit/Upstream429",
+          details: [
+            `Provider: ${providerMatch.name}`,
+            `Method: ${request.method}`,
+            `Uri: ${upstreamUrl}`,
+          ],
+        });
+      }
+    }
 
     const enrichedResponse = withTokenLimitHeaders(
       response,

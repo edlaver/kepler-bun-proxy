@@ -18,6 +18,11 @@ interface ResponseLogInput {
   body: Uint8Array | undefined;
 }
 
+interface EventLogInput {
+  title: string;
+  details: string[];
+}
+
 export class DebugLogger {
   private readonly getDebugPath: () => string | undefined;
   private readonly textDecoder = new TextDecoder();
@@ -77,6 +82,21 @@ export class DebugLogger {
     await this.writeLogFile(debugPath, "response", lines);
   }
 
+  async logEvent(input: EventLogInput): Promise<void> {
+    const debugPath = this.getDebugPath();
+    if (!debugPath?.trim()) {
+      return;
+    }
+
+    const lines: string[] = [];
+    lines.push("# Event", "", `**Type**: ${input.title}`);
+    for (const detail of input.details) {
+      lines.push(`- ${detail}`);
+    }
+
+    await this.writeLogFile(debugPath, "event", lines);
+  }
+
   private prettyPrintPayload(payload: Uint8Array): string {
     const rawText = this.textDecoder.decode(payload);
     const normalized = rawText.replace(/^\uFEFF/, "").trim();
@@ -92,7 +112,7 @@ export class DebugLogger {
 
   private async writeLogFile(
     debugPath: string,
-    suffix: "request" | "response",
+    suffix: "request" | "response" | "event",
     lines: string[],
   ): Promise<void> {
     await mkdir(debugPath, { recursive: true });

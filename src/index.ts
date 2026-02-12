@@ -92,7 +92,10 @@ app.all("*", async (c) => {
   );
 
   let tokenLimitSnapshot: TokenLimitSnapshot | null = null;
-  if (providerMatch.provider.tokenLimitPerMinute > 0) {
+  if (
+    proxyConfig.rateLimitEnabled &&
+    providerMatch.provider.tokenLimitPerMinute > 0
+  ) {
     if (preparedBody.payloadForTokenCount) {
       const tokens = tokenCounter.countTokens(
         preparedBody.payloadForTokenCount,
@@ -226,7 +229,11 @@ if (debugEnabled && debugPath) {
 }
 
 const initialConfig = configStore.getConfig();
-registerProviderLimits(tokenRateLimiter, initialConfig.proxy.providers);
+registerProviderLimits(
+  tokenRateLimiter,
+  initialConfig.proxy.providers,
+  initialConfig.proxy.rateLimitEnabled,
+);
 
 function resolveProvider(
   providers: Record<string, ProviderConfig>,
@@ -256,7 +263,12 @@ function resolveProvider(
 function registerProviderLimits(
   rateLimiter: TokenRateLimiter,
   providers: Record<string, ProviderConfig>,
+  rateLimitEnabled: boolean,
 ): void {
+  if (!rateLimitEnabled) {
+    return;
+  }
+
   for (const [name, provider] of Object.entries(providers)) {
     if (provider.tokenLimitPerMinute > 0) {
       rateLimiter.registerLimit(name, provider.tokenLimitPerMinute);

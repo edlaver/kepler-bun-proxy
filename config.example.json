@@ -1,6 +1,7 @@
 {
   "convertToken": false,
   "tokenEndpoint": "https://your-gateway.com/token",
+  "rateLimitEnabled": true,
   "debugPath": "./logs",
   "providers": {
     "openai": {

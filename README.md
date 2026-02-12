@@ -23,6 +23,7 @@ Config is a single, top-level object (no `Proxy` wrapper). Key highlights:
 
 - `convertToken` (boolean)
 - `tokenEndpoint` (string)
+- `rateLimitEnabled` (boolean; defaults to `false` when omitted)
 - `debugPath` (string, optional; used only when `--debug`/`-d` is provided)
 - `providers` (record of providers)
 - Provider settings include `routePrefix`, `upstreamTemplate`, `defaultModel`,

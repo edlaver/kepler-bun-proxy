@@ -28,6 +28,7 @@ const providerSchema = z.object({
 const proxySchema = z.object({
   convertToken: z.boolean().default(false),
   tokenEndpoint: z.string().default(DEFAULT_TOKEN_ENDPOINT),
+  rateLimitEnabled: z.boolean().default(false),
   debugPath: z.string().nullable().optional(),
   providers: z.record(providerSchema).default({}),
 });
@@ -107,6 +108,7 @@ function mapProxyConfig(source: z.infer<typeof proxySchema>): ProxyConfig {
   return {
     convertToken: source.convertToken,
     tokenEndpoint: source.tokenEndpoint.trim() || DEFAULT_TOKEN_ENDPOINT,
+    rateLimitEnabled: source.rateLimitEnabled,
     debugPath: debugPath && debugPath.length > 0 ? debugPath : undefined,
     providers,
   };

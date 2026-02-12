@@ -16,6 +16,7 @@ export interface ProviderModelConfig {
 export interface ProxyConfig {
   convertToken: boolean;
   tokenEndpoint: string;
+  rateLimitEnabled: boolean;
   debugPath?: string;
   providers: Record<string, ProviderConfig>;
 }

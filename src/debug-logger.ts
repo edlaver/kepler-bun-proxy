@@ -125,17 +125,18 @@ function maskAuthorizationValue(value: string): string {
 
   const parts = trimmed.split(/\s+/);
   if (parts.length === 1) {
-    return maskToken(parts[0]);
+    const singleToken = parts[0];
+    return singleToken ? maskToken(singleToken) : value;
   }
 
   const [scheme, ...rest] = parts;
   const token = rest.join(" ");
   const maskedToken = maskToken(token);
-  if (scheme.toLowerCase() === "bearer") {
+  if (scheme && scheme.toLowerCase() === "bearer") {
     return `Bearer ${maskedToken}`;
   }
 
-  return `${scheme} ${maskedToken}`;
+  return scheme ? `${scheme} ${maskedToken}` : maskedToken;
 }
 
 function maskToken(token: string): string {

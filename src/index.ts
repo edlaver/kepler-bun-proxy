@@ -23,6 +23,8 @@ interface PreparedRequestBody {
   payloadForTokenCount: string | undefined;
   resolvedModel: string | undefined;
   bodyWasMutated: boolean;
+  mimicStreamingForClient: boolean;
+  includeUsageInStreaming: boolean;
 }
 
 const configStore = await ConfigStore.create(process.cwd());
@@ -210,23 +212,28 @@ app.all("*", async (c) => {
       response,
       tokenLimitSnapshot,
     );
+    const finalResponse = await maybeMimicChatCompletionsStreaming(
+      enrichedResponse,
+      preparedBody.mimicStreamingForClient,
+      preparedBody.includeUsageInStreaming,
+    );
 
     if (!debugLogger.isEnabled()) {
-      return enrichedResponse;
+      return finalResponse;
     }
 
     const responseBody = new Uint8Array(
-      await enrichedResponse.clone().arrayBuffer(),
+      await finalResponse.clone().arrayBuffer(),
     );
     await debugLogger.logResponse({
-      status: enrichedResponse.status,
-      statusText: enrichedResponse.statusText,
+      status: finalResponse.status,
+      statusText: finalResponse.statusText,
       uri: upstreamUrl,
-      headers: enrichedResponse.headers,
+      headers: finalResponse.headers,
       body: responseBody,
     });
 
-    return enrichedResponse;
+    return finalResponse;
   };
 
   if (!proxyConfig.convertToken || !originalAuth) {
@@ -331,6 +338,7 @@ async function prepareRequestBody(
 ): Promise<PreparedRequestBody> {
   const rawBody = new Uint8Array(await request.arrayBuffer());
   const defaultModel = provider.defaultModel || undefined;
+  const isChatCompletionsRequest = isChatCompletionsPath(pathname);
 
   if (rawBody.byteLength === 0) {
     return {
@@ -338,6 +346,8 @@ async function prepareRequestBody(
       payloadForTokenCount: undefined,
       resolvedModel: defaultModel,
       bodyWasMutated: false,
+      mimicStreamingForClient: false,
+      includeUsageInStreaming: false,
     };
   }
 
@@ -348,6 +358,8 @@ async function prepareRequestBody(
       payloadForTokenCount: undefined,
       resolvedModel: defaultModel,
       bodyWasMutated: false,
+      mimicStreamingForClient: false,
+      includeUsageInStreaming: false,
     };
   }
 
@@ -360,8 +372,18 @@ async function prepareRequestBody(
       payloadForTokenCount: undefined,
       resolvedModel: defaultModel,
       bodyWasMutated: false,
+      mimicStreamingForClient: false,
+      includeUsageInStreaming: false,
     };
   }
+
+  const streamRequested = parsed.stream === true;
+  const includeUsageInStreaming = readIncludeUsageFromStreamOptions(parsed);
+  const mimicStreamingForClient =
+    isChatCompletionsRequest &&
+    provider.mimicStreaming &&
+    !provider.disableStreaming &&
+    streamRequested;
 
   const currentModel =
     typeof parsed.model === "string" ? parsed.model : undefined;
@@ -381,8 +403,19 @@ async function prepareRequestBody(
 
   const disableStreaming =
     provider.disableStreaming &&
-    pathname.toLowerCase().endsWith("/chat/completions");
+    isChatCompletionsRequest;
   if (disableStreaming) {
+    if (parsed.stream !== false) {
+      parsed.stream = false;
+      updated = true;
+    }
+    if (Object.prototype.hasOwnProperty.call(parsed, "stream_options")) {
+      delete parsed.stream_options;
+      updated = true;
+    }
+  }
+
+  if (mimicStreamingForClient) {
     if (parsed.stream !== false) {
       parsed.stream = false;
       updated = true;
@@ -409,6 +442,8 @@ async function prepareRequestBody(
       payloadForTokenCount: rawText,
       resolvedModel: resolvedModel || undefined,
       bodyWasMutated: false,
+      mimicStreamingForClient,
+      includeUsageInStreaming,
     };
   }
 
@@ -420,7 +455,211 @@ async function prepareRequestBody(
     payloadForTokenCount: updatedPayload,
     resolvedModel: resolvedModel || undefined,
     bodyWasMutated: true,
+    mimicStreamingForClient,
+    includeUsageInStreaming,
   };
+}
+
+function isChatCompletionsPath(pathname: string): boolean {
+  return pathname.toLowerCase().endsWith("/chat/completions");
+}
+
+function readIncludeUsageFromStreamOptions(
+  payload: Record<string, unknown>,
+): boolean {
+  const streamOptions = payload.stream_options;
+  if (
+    typeof streamOptions !== "object" ||
+    streamOptions === null ||
+    Array.isArray(streamOptions)
+  ) {
+    return false;
+  }
+
+  return (streamOptions as Record<string, unknown>).include_usage === true;
+}
+
+async function maybeMimicChatCompletionsStreaming(
+  response: Response,
+  enabled: boolean,
+  includeUsageInStreaming: boolean,
+): Promise<Response> {
+  if (!enabled || !response.ok) {
+    return response;
+  }
+
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  if (!contentType.includes("application/json")) {
+    return response;
+  }
+
+  const parsed = safeParseJsonObject(await response.clone().text());
+  if (!parsed) {
+    return response;
+  }
+
+  const sseEvents = buildSyntheticChatCompletionEvents(
+    parsed,
+    includeUsageInStreaming,
+  );
+  if (!sseEvents) {
+    return response;
+  }
+
+  const headers = new Headers(response.headers);
+  headers.set("content-type", "text/event-stream; charset=utf-8");
+  headers.set("cache-control", "no-cache");
+  headers.set("connection", "keep-alive");
+  headers.delete("content-length");
+  headers.delete("content-encoding");
+
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const event of sseEvents) {
+        controller.enqueue(encoder.encode(`data: ${event}\n\n`));
+      }
+      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+function buildSyntheticChatCompletionEvents(
+  completion: Record<string, unknown>,
+  includeUsageInStreaming: boolean,
+): string[] | null {
+  const rawChoices = completion.choices;
+  if (!Array.isArray(rawChoices) || rawChoices.length === 0) {
+    return null;
+  }
+
+  const id =
+    typeof completion.id === "string" && completion.id.trim().length > 0
+      ? completion.id
+      : `chatcmpl-mimic-${Date.now()}`;
+  const created =
+    typeof completion.created === "number" && Number.isFinite(completion.created)
+      ? completion.created
+      : Math.floor(Date.now() / 1000);
+  const model = typeof completion.model === "string" ? completion.model : "";
+  const systemFingerprint =
+    typeof completion.system_fingerprint === "string"
+      ? completion.system_fingerprint
+      : undefined;
+
+  const chunks: string[] = [];
+
+  const emitChunk = (
+    index: number,
+    delta: Record<string, unknown>,
+    finishReason: string | null,
+  ): void => {
+    const chunk: Record<string, unknown> = {
+      id,
+      object: "chat.completion.chunk",
+      created,
+      model,
+      choices: [
+        {
+          index,
+          delta,
+          finish_reason: finishReason,
+        },
+      ],
+    };
+
+    if (systemFingerprint) {
+      chunk.system_fingerprint = systemFingerprint;
+    }
+
+    chunks.push(JSON.stringify(chunk));
+  };
+
+  rawChoices.forEach((rawChoice, fallbackIndex) => {
+    if (typeof rawChoice !== "object" || rawChoice === null) {
+      return;
+    }
+
+    const choice = rawChoice as Record<string, unknown>;
+    const index =
+      typeof choice.index === "number" && Number.isFinite(choice.index)
+        ? choice.index
+        : fallbackIndex;
+    const finishReason =
+      typeof choice.finish_reason === "string" ? choice.finish_reason : "stop";
+
+    const message =
+      typeof choice.message === "object" &&
+      choice.message !== null &&
+      !Array.isArray(choice.message)
+        ? (choice.message as Record<string, unknown>)
+        : {};
+
+    const role =
+      typeof message.role === "string" && message.role.trim().length > 0
+        ? message.role
+        : "assistant";
+    emitChunk(index, { role }, null);
+
+    const payloadDelta: Record<string, unknown> = {};
+
+    if (typeof message.content === "string" && message.content.length > 0) {
+      payloadDelta.content = message.content;
+    } else if (Array.isArray(message.content) && message.content.length > 0) {
+      payloadDelta.content = message.content;
+    }
+
+    if (typeof message.refusal === "string" && message.refusal.length > 0) {
+      payloadDelta.refusal = message.refusal;
+    }
+
+    if (message.tool_calls !== undefined) {
+      payloadDelta.tool_calls = message.tool_calls;
+    }
+
+    if (
+      typeof message.function_call === "object" &&
+      message.function_call !== null
+    ) {
+      payloadDelta.function_call = message.function_call;
+    }
+
+    if (Object.keys(payloadDelta).length > 0) {
+      emitChunk(index, payloadDelta, null);
+    }
+
+    emitChunk(index, {}, finishReason);
+  });
+
+  if (
+    includeUsageInStreaming &&
+    typeof completion.usage === "object" &&
+    completion.usage !== null
+  ) {
+    const usageChunk: Record<string, unknown> = {
+      id,
+      object: "chat.completion.chunk",
+      created,
+      model,
+      choices: [],
+      usage: completion.usage,
+    };
+
+    if (systemFingerprint) {
+      usageChunk.system_fingerprint = systemFingerprint;
+    }
+
+    chunks.push(JSON.stringify(usageChunk));
+  }
+
+  return chunks;
 }
 
 function safeParseJsonObject(value: string): Record<string, unknown> | null {

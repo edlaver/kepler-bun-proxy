@@ -5,6 +5,7 @@ export interface ProviderConfig {
   models: Record<string, ProviderModelConfig>;
   modelAliasLookup: Record<string, string>;
   disableStreaming: boolean;
+  mimicStreaming: boolean;
   stripRequestProperties: string[];
   tokenLimitPerMinute: number;
 }

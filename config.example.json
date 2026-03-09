@@ -1,7 +1,7 @@
 {
   "convertToken": false,
   "tokenEndpoint": "https://your-gateway.com/token",
-  "rateLimitEnabled": true,
+  "rateLimitEnabled": false,
   "debugPath": "./logs",
   "providers": {
     "openai": {
@@ -10,6 +10,7 @@
       "upstreamTemplate": "https://api.openai.com",
       "defaultModel": "gpt-5.1-2025-11-13",
       "disableStreaming": true,
+      "mimicStreaming": false,
       "tokenLimitPerMinute": 200000,
       "stripRequestProperties": ["max_tokens"],
       "models": {

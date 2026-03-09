@@ -21,6 +21,7 @@ const providerSchema = z.object({
   defaultModel: z.string().default(""),
   models: z.record(providerModelSchema).default({}),
   disableStreaming: z.boolean().default(false),
+  mimicStreaming: z.boolean().default(false),
   stripRequestProperties: z.array(z.string()).default([]),
   tokenLimitPerMinute: z.number().int().nonnegative().default(0),
 });
@@ -96,6 +97,7 @@ function mapProxyConfig(source: z.infer<typeof proxySchema>): ProxyConfig {
       models,
       modelAliasLookup,
       disableStreaming: provider.disableStreaming,
+      mimicStreaming: provider.mimicStreaming,
       stripRequestProperties: provider.stripRequestProperties
         .map((property) => property.trim())
         .filter((property) => property.length > 0),

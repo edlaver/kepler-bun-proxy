@@ -27,7 +27,7 @@ Config is a single, top-level object (no `Proxy` wrapper). Key highlights:
 - `debugPath` (string, optional; used only when `--debug`/`-d` is provided)
 - `providers` (record of providers)
 - Provider settings include `routePrefix`, `upstreamTemplate`, `defaultModel`,
-  `modelAliases`, `disableStreaming`, `tokenLimitPerMinute`,
+  `modelAliases`, `disableStreaming`, `mimicStreaming`, `tokenLimitPerMinute`,
   and `stripRequestProperties`.
 
 ## Scripts

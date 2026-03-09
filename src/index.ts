@@ -251,6 +251,7 @@ app.all("*", async (c) => {
 
 const bootConfig = configStore.getConfig();
 const server = Bun.serve({
+  idleTimeout: 0, // Disable idle timeout to allow long-running requests
   fetch: app.fetch,
   hostname: bootConfig.host,
   port: bootConfig.port,
@@ -402,8 +403,7 @@ async function prepareRequestBody(
   }
 
   const disableStreaming =
-    provider.disableStreaming &&
-    isChatCompletionsRequest;
+    provider.disableStreaming && isChatCompletionsRequest;
   if (disableStreaming) {
     if (parsed.stream !== false) {
       parsed.stream = false;
@@ -545,7 +545,8 @@ function buildSyntheticChatCompletionEvents(
       ? completion.id
       : `chatcmpl-mimic-${Date.now()}`;
   const created =
-    typeof completion.created === "number" && Number.isFinite(completion.created)
+    typeof completion.created === "number" &&
+    Number.isFinite(completion.created)
       ? completion.created
       : Math.floor(Date.now() / 1000);
   const model = typeof completion.model === "string" ? completion.model : "";

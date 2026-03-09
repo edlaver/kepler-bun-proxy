@@ -1,0 +1,27 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "autoupdate": true,
+  //// Note: You can set the default model for OpenCode by toggling the
+  ////  desired line below. Make sure to choose a model that is enabled in
+  //// the "enabled_providers" section below.
+  "model": "kepler-bun-proxy/gpt-5.1",
+  ////
+  "enabled_providers": ["kepler-bun-proxy"],
+  "provider": {
+    "kepler-bun-proxy": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "kepler-bun-proxy (OpenAI Completions)",
+      "options": {
+        "baseURL": "http://localhost:4000/v1/",
+        "apiKey": "ignore"
+      },
+      "models": {
+        "gpt-5.1": {
+          "name": "GPT-5.1",
+          "tool_call": true,
+          "reasoning": true
+        }
+      }
+    }
+  }
+}

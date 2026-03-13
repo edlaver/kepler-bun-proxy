@@ -26,6 +26,7 @@ interface PreparedRequestBody {
   bodyWasMutated: boolean;
   mimicStreamingForClient: boolean;
   includeUsageInStreaming: boolean;
+  includeObfuscationInStreaming: boolean;
 }
 
 const configStore = await ConfigStore.create(process.cwd());
@@ -217,6 +218,7 @@ app.all("*", async (c) => {
       enrichedResponse,
       preparedBody.mimicStreamingForClient,
       preparedBody.includeUsageInStreaming,
+      preparedBody.includeObfuscationInStreaming,
     );
 
     if (!debugLogger.isEnabled()) {
@@ -350,6 +352,7 @@ async function prepareRequestBody(
       bodyWasMutated: false,
       mimicStreamingForClient: false,
       includeUsageInStreaming: false,
+      includeObfuscationInStreaming: false,
     };
   }
 
@@ -362,6 +365,7 @@ async function prepareRequestBody(
       bodyWasMutated: false,
       mimicStreamingForClient: false,
       includeUsageInStreaming: false,
+      includeObfuscationInStreaming: false,
     };
   }
 
@@ -376,11 +380,14 @@ async function prepareRequestBody(
       bodyWasMutated: false,
       mimicStreamingForClient: false,
       includeUsageInStreaming: false,
+      includeObfuscationInStreaming: false,
     };
   }
 
   const streamRequested = parsed.stream === true;
   const includeUsageInStreaming = readIncludeUsageFromStreamOptions(parsed);
+  const includeObfuscationInStreaming =
+    readIncludeObfuscationFromStreamOptions(parsed);
   const mimicStreamingForClient =
     isChatCompletionsRequest &&
     provider.mimicStreaming &&
@@ -445,6 +452,7 @@ async function prepareRequestBody(
       bodyWasMutated: false,
       mimicStreamingForClient,
       includeUsageInStreaming,
+      includeObfuscationInStreaming,
     };
   }
 
@@ -458,6 +466,7 @@ async function prepareRequestBody(
     bodyWasMutated: true,
     mimicStreamingForClient,
     includeUsageInStreaming,
+    includeObfuscationInStreaming,
   };
 }
 
@@ -478,6 +487,21 @@ function readIncludeUsageFromStreamOptions(
   }
 
   return (streamOptions as Record<string, unknown>).include_usage === true;
+}
+
+function readIncludeObfuscationFromStreamOptions(
+  payload: Record<string, unknown>,
+): boolean {
+  const streamOptions = payload.stream_options;
+  if (
+    typeof streamOptions !== "object" ||
+    streamOptions === null ||
+    Array.isArray(streamOptions)
+  ) {
+    return true;
+  }
+
+  return (streamOptions as Record<string, unknown>).include_obfuscation !== false;
 }
 
 function safeParseJsonObject(value: string): Record<string, unknown> | null {

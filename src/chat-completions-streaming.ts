@@ -2,6 +2,7 @@ export async function maybeMimicChatCompletionsStreaming(
   response: Response,
   enabled: boolean,
   includeUsageInStreaming: boolean,
+  includeObfuscationInStreaming: boolean,
 ): Promise<Response> {
   if (!enabled || !response.ok) {
     return response;
@@ -20,6 +21,7 @@ export async function maybeMimicChatCompletionsStreaming(
   const sseEvents = buildSyntheticChatCompletionEvents(
     parsed,
     includeUsageInStreaming,
+    includeObfuscationInStreaming,
   );
   if (!sseEvents) {
     return response;
@@ -53,6 +55,7 @@ export async function maybeMimicChatCompletionsStreaming(
 export function buildSyntheticChatCompletionEvents(
   completion: Record<string, unknown>,
   includeUsageInStreaming: boolean,
+  includeObfuscationInStreaming: boolean,
 ): string[] | null {
   const rawChoices = completion.choices;
   if (!Array.isArray(rawChoices) || rawChoices.length === 0) {
@@ -79,6 +82,9 @@ export function buildSyntheticChatCompletionEvents(
       : undefined;
 
   const chunks: string[] = [];
+  const obfuscation = includeObfuscationInStreaming
+    ? createObfuscation()
+    : undefined;
 
   const buildChunk = (
     choices: Record<string, unknown>[],
@@ -102,6 +108,10 @@ export function buildSyntheticChatCompletionEvents(
 
     if (includeUsageInStreaming) {
       chunk.usage = usage;
+    }
+
+    if (obfuscation && choices.length > 0) {
+      chunk.obfuscation = obfuscation;
     }
 
     return chunk;
@@ -154,7 +164,15 @@ export function buildSyntheticChatCompletionEvents(
         ? message.role
         : "assistant";
     const normalizedContent = normalizeDeltaContent(message.content);
-    const payloadDelta: Record<string, unknown> = { role };
+    const roleDelta: Record<string, unknown> = { role };
+
+    if (normalizedContent !== undefined) {
+      roleDelta.content = "";
+    }
+
+    emitChunk(index, roleDelta, null);
+
+    const payloadDelta: Record<string, unknown> = {};
 
     if (normalizedContent !== undefined && normalizedContent.length > 0) {
       payloadDelta.content = normalizedContent;
@@ -311,4 +329,8 @@ function normalizeDeltaContent(value: unknown): string | undefined {
   });
 
   return textParts.length > 0 ? textParts.join("") : undefined;
+}
+
+function createObfuscation(): string {
+  return Math.random().toString(36).slice(2, 18);
 }

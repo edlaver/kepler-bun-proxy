@@ -13,20 +13,6 @@ export async function maybeMimicChatCompletionsStreaming(
     return response;
   }
 
-  const parsed = safeParseJsonObject(await response.clone().text());
-  if (!parsed) {
-    return response;
-  }
-
-  const sseEvents = buildSyntheticChatCompletionEvents(
-    parsed,
-    includeUsageInStreaming,
-    includeObfuscationInStreaming,
-  );
-  if (!sseEvents) {
-    return response;
-  }
-
   const headers = new Headers(response.headers);
   headers.set("content-type", "text/event-stream; charset=utf-8");
   headers.set("cache-control", "no-cache");
@@ -36,12 +22,32 @@ export async function maybeMimicChatCompletionsStreaming(
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      for (const event of sseEvents) {
-        controller.enqueue(encoder.encode(`data: ${event}\n\n`));
+    async start(controller) {
+      try {
+        const parsed = safeParseJsonObject(await response.text());
+        if (!parsed) {
+          throw new Error("Upstream response was not a JSON object.");
+        }
+
+        const sseEvents = buildSyntheticChatCompletionEvents(
+          parsed,
+          includeUsageInStreaming,
+          includeObfuscationInStreaming,
+        );
+        if (!sseEvents) {
+          throw new Error(
+            "Upstream response did not match chat completion shape.",
+          );
+        }
+
+        for (const event of sseEvents) {
+          controller.enqueue(encoder.encode(`data: ${event}\n\n`));
+        }
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+      } catch (error) {
+        controller.error(error);
       }
-      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-      controller.close();
     },
   });
 

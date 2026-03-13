@@ -153,17 +153,8 @@ export function buildSyntheticChatCompletionEvents(
       typeof message.role === "string" && message.role.trim().length > 0
         ? message.role
         : "assistant";
-    const roleDelta: Record<string, unknown> = { role };
-
     const normalizedContent = normalizeDeltaContent(message.content);
-
-    if (normalizedContent !== undefined) {
-      roleDelta.content = "";
-    }
-
-    emitChunk(index, roleDelta, null);
-
-    const payloadDelta: Record<string, unknown> = {};
+    const payloadDelta: Record<string, unknown> = { role };
 
     if (normalizedContent !== undefined && normalizedContent.length > 0) {
       payloadDelta.content = normalizedContent;

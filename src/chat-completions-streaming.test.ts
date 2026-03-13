@@ -34,7 +34,7 @@ describe("buildSyntheticChatCompletionEvents", () => {
     );
 
     expect(events).not.toBeNull();
-    expect(events).toHaveLength(4);
+    expect(events).toHaveLength(3);
 
     const parsedEvents = events!.map((event) => JSON.parse(event));
 
@@ -51,7 +51,7 @@ describe("buildSyntheticChatCompletionEvents", () => {
           index: 0,
           delta: {
             role: "assistant",
-            content: "",
+            content: "Hello",
           },
           logprobs: null,
           finish_reason: null,
@@ -70,26 +70,6 @@ describe("buildSyntheticChatCompletionEvents", () => {
       choices: [
         {
           index: 0,
-          delta: {
-            content: "Hello",
-          },
-          logprobs: null,
-          finish_reason: null,
-        },
-      ],
-    });
-
-    expect(parsedEvents[2]).toEqual({
-      id: "chatcmpl-123",
-      object: "chat.completion.chunk",
-      created: 1_700_000_000,
-      model: "gpt-4o-mini",
-      service_tier: "default",
-      system_fingerprint: "fp_abc",
-      usage: null,
-      choices: [
-        {
-          index: 0,
           delta: {},
           logprobs: null,
           finish_reason: "stop",
@@ -97,7 +77,7 @@ describe("buildSyntheticChatCompletionEvents", () => {
       ],
     });
 
-    expect(parsedEvents[3]).toEqual({
+    expect(parsedEvents[2]).toEqual({
       id: "chatcmpl-123",
       object: "chat.completion.chunk",
       created: 1_700_000_000,
@@ -143,10 +123,10 @@ describe("buildSyntheticChatCompletionEvents", () => {
     );
 
     expect(events).not.toBeNull();
-    expect(events).toHaveLength(3);
+    expect(events).toHaveLength(2);
 
     const parsedEvents = events!.map((event) => JSON.parse(event));
-    expect(parsedEvents[1]).toEqual({
+    expect(parsedEvents[0]).toEqual({
       id: "chatcmpl-456",
       object: "chat.completion.chunk",
       created: 1_700_000_001,
@@ -155,6 +135,7 @@ describe("buildSyntheticChatCompletionEvents", () => {
         {
           index: 0,
           delta: {
+            role: "assistant",
             tool_calls: [
               {
                 index: 0,
@@ -203,16 +184,12 @@ describe("buildSyntheticChatCompletionEvents", () => {
     );
 
     expect(events).not.toBeNull();
-    expect(events).toHaveLength(3);
+    expect(events).toHaveLength(2);
 
     const parsedEvents = events!.map((event) => JSON.parse(event));
 
     expect(parsedEvents[0].choices[0].delta).toEqual({
       role: "assistant",
-      content: "",
-    });
-
-    expect(parsedEvents[1].choices[0].delta).toEqual({
       content: "Hello world",
       function_call: {
         name: "write_file",

@@ -174,7 +174,10 @@ export function buildSyntheticChatCompletionEvents(
     }
 
     if (message.tool_calls !== undefined) {
-      payloadDelta.tool_calls = message.tool_calls;
+      const toolCalls = normalizeToolCallsDelta(message.tool_calls);
+      if (toolCalls.length > 0) {
+        payloadDelta.tool_calls = toolCalls;
+      }
     }
 
     if (
@@ -219,4 +222,42 @@ function safeParseJsonObject(value: string): Record<string, unknown> | null {
   } catch {
     return null;
   }
+}
+
+function normalizeToolCallsDelta(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry, fallbackIndex) => {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      return [];
+    }
+
+    const toolCall = entry as Record<string, unknown>;
+    const normalized: Record<string, unknown> = {
+      index:
+        typeof toolCall.index === "number" && Number.isFinite(toolCall.index)
+          ? toolCall.index
+          : fallbackIndex,
+    };
+
+    if (typeof toolCall.id === "string" && toolCall.id.length > 0) {
+      normalized.id = toolCall.id;
+    }
+
+    if (typeof toolCall.type === "string" && toolCall.type.length > 0) {
+      normalized.type = toolCall.type;
+    }
+
+    if (
+      typeof toolCall.function === "object" &&
+      toolCall.function !== null &&
+      !Array.isArray(toolCall.function)
+    ) {
+      normalized.function = toolCall.function;
+    }
+
+    return [normalized];
+  });
 }

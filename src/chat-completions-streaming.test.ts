@@ -112,6 +112,67 @@ describe("buildSyntheticChatCompletionEvents", () => {
       choices: [],
     });
   });
+
+  test("normalizes tool call deltas with indexes", () => {
+    const events = buildSyntheticChatCompletionEvents(
+      {
+        id: "chatcmpl-456",
+        created: 1_700_000_001,
+        model: "gpt-5.1-2025-11-13",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              tool_calls: [
+                {
+                  id: "call_X53UdzCsGJh9AmO5GFa5LbLD",
+                  type: "function",
+                  function: {
+                    name: "read",
+                    arguments: '{"filePath":"--filename---"}',
+                  },
+                },
+              ],
+            },
+            finish_reason: "tool_calls",
+          },
+        ],
+      },
+      false,
+    );
+
+    expect(events).not.toBeNull();
+    expect(events).toHaveLength(3);
+
+    const parsedEvents = events!.map((event) => JSON.parse(event));
+    expect(parsedEvents[1]).toEqual({
+      id: "chatcmpl-456",
+      object: "chat.completion.chunk",
+      created: 1_700_000_001,
+      model: "gpt-5.1-2025-11-13",
+      choices: [
+        {
+          index: 0,
+          delta: {
+            tool_calls: [
+              {
+                index: 0,
+                id: "call_X53UdzCsGJh9AmO5GFa5LbLD",
+                type: "function",
+                function: {
+                  name: "read",
+                  arguments: '{"filePath":"--filename---"}',
+                },
+              },
+            ],
+          },
+          logprobs: null,
+          finish_reason: null,
+        },
+      ],
+    });
+  });
 });
 
 describe("maybeMimicChatCompletionsStreaming", () => {

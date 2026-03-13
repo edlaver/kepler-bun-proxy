@@ -155,7 +155,9 @@ export function buildSyntheticChatCompletionEvents(
         : "assistant";
     const roleDelta: Record<string, unknown> = { role };
 
-    if (typeof message.content === "string") {
+    const normalizedContent = normalizeDeltaContent(message.content);
+
+    if (normalizedContent !== undefined) {
       roleDelta.content = "";
     }
 
@@ -163,10 +165,8 @@ export function buildSyntheticChatCompletionEvents(
 
     const payloadDelta: Record<string, unknown> = {};
 
-    if (typeof message.content === "string" && message.content.length > 0) {
-      payloadDelta.content = message.content;
-    } else if (Array.isArray(message.content) && message.content.length > 0) {
-      payloadDelta.content = message.content;
+    if (normalizedContent !== undefined && normalizedContent.length > 0) {
+      payloadDelta.content = normalizedContent;
     }
 
     if (typeof message.refusal === "string" && message.refusal.length > 0) {
@@ -184,7 +184,10 @@ export function buildSyntheticChatCompletionEvents(
       typeof message.function_call === "object" &&
       message.function_call !== null
     ) {
-      payloadDelta.function_call = message.function_call;
+      const functionCall = normalizeFunctionCallDelta(message.function_call);
+      if (Object.keys(functionCall).length > 0) {
+        payloadDelta.function_call = functionCall;
+      }
     }
 
     if (Object.keys(payloadDelta).length > 0) {
@@ -255,9 +258,66 @@ function normalizeToolCallsDelta(value: unknown): Record<string, unknown>[] {
       toolCall.function !== null &&
       !Array.isArray(toolCall.function)
     ) {
-      normalized.function = toolCall.function;
+      const fn = normalizeFunctionCallDelta(toolCall.function);
+      if (Object.keys(fn).length > 0) {
+        normalized.function = fn;
+      }
     }
 
     return [normalized];
   });
+}
+
+function normalizeFunctionCallDelta(
+  value: unknown,
+): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return {};
+  }
+
+  const functionCall = value as Record<string, unknown>;
+  const normalized: Record<string, unknown> = {};
+
+  if (
+    typeof functionCall.name === "string" &&
+    functionCall.name.length > 0
+  ) {
+    normalized.name = functionCall.name;
+  }
+
+  if (typeof functionCall.arguments === "string") {
+    normalized.arguments = functionCall.arguments;
+  }
+
+  return normalized;
+}
+
+function normalizeDeltaContent(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const textParts = value.flatMap((part) => {
+    if (typeof part === "string") {
+      return [part];
+    }
+
+    if (typeof part !== "object" || part === null || Array.isArray(part)) {
+      return [];
+    }
+
+    const record = part as Record<string, unknown>;
+
+    if (typeof record.text === "string") {
+      return [record.text];
+    }
+
+    return [];
+  });
+
+  return textParts.length > 0 ? textParts.join("") : undefined;
 }

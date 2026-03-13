@@ -173,6 +173,53 @@ describe("buildSyntheticChatCompletionEvents", () => {
       ],
     });
   });
+
+  test("normalizes deprecated function_call and array content into valid delta shapes", () => {
+    const events = buildSyntheticChatCompletionEvents(
+      {
+        id: "chatcmpl-789",
+        created: 1_700_000_002,
+        model: "gpt-4o-mini",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: [
+                { type: "output_text", text: "Hello " },
+                { type: "output_text", text: "world" },
+              ],
+              function_call: {
+                name: "write_file",
+                arguments: '{"path":"notes.txt"}',
+                ignored: true,
+              },
+            },
+            finish_reason: "function_call",
+          },
+        ],
+      },
+      false,
+    );
+
+    expect(events).not.toBeNull();
+    expect(events).toHaveLength(3);
+
+    const parsedEvents = events!.map((event) => JSON.parse(event));
+
+    expect(parsedEvents[0].choices[0].delta).toEqual({
+      role: "assistant",
+      content: "",
+    });
+
+    expect(parsedEvents[1].choices[0].delta).toEqual({
+      content: "Hello world",
+      function_call: {
+        name: "write_file",
+        arguments: '{"path":"notes.txt"}',
+      },
+    });
+  });
 });
 
 describe("maybeMimicChatCompletionsStreaming", () => {

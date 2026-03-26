@@ -36,6 +36,8 @@ Config is a single, top-level object (no `Proxy` wrapper). Key highlights:
 - Provider settings include `routePrefix`, `upstreamTemplate`, `defaultModel`,
   `modelAliases`, `disableStreaming`, `mimicStreaming`, `tokenLimitPerMinute`,
   and `stripRequestProperties`.
+- `mimicStreaming` can synthesize OpenAI-compatible SSE responses for both
+  `/v1/chat/completions` and `/v1/responses` when the upstream returns JSON.
 
 ## Scripts
 

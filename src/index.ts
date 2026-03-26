@@ -3,6 +3,7 @@ import { parseArgs } from "util";
 import { Hono } from "hono";
 import { proxy } from "hono/proxy";
 import { maybeMimicChatCompletionsStreaming } from "./chat-completions-streaming";
+import { maybeMimicResponsesStreaming } from "./responses-streaming";
 import { ConfigStore } from "./config-store";
 import { DebugLogger } from "./debug-logger";
 import { TokenCounter } from "./token-counter";
@@ -25,6 +26,7 @@ interface PreparedRequestBody {
   resolvedModel: string | undefined;
   bodyWasMutated: boolean;
   mimicStreamingForClient: boolean;
+  mimicStreamingFormat: "chat_completions" | "responses" | null;
   includeUsageInStreaming: boolean;
   includeObfuscationInStreaming: boolean;
 }
@@ -214,12 +216,21 @@ app.all("*", async (c) => {
       response,
       tokenLimitSnapshot,
     );
-    const finalResponse = await maybeMimicChatCompletionsStreaming(
-      enrichedResponse,
-      preparedBody.mimicStreamingForClient,
-      preparedBody.includeUsageInStreaming,
-      preparedBody.includeObfuscationInStreaming,
-    );
+    let finalResponse = enrichedResponse;
+    if (preparedBody.mimicStreamingFormat === "chat_completions") {
+      finalResponse = await maybeMimicChatCompletionsStreaming(
+        enrichedResponse,
+        preparedBody.mimicStreamingForClient,
+        preparedBody.includeUsageInStreaming,
+        preparedBody.includeObfuscationInStreaming,
+      );
+    } else if (preparedBody.mimicStreamingFormat === "responses") {
+      finalResponse = await maybeMimicResponsesStreaming(
+        enrichedResponse,
+        preparedBody.mimicStreamingForClient,
+        preparedBody.includeObfuscationInStreaming,
+      );
+    }
 
     if (!debugLogger.isEnabled()) {
       return finalResponse;
@@ -342,7 +353,9 @@ async function prepareRequestBody(
 ): Promise<PreparedRequestBody> {
   const rawBody = new Uint8Array(await request.arrayBuffer());
   const defaultModel = provider.defaultModel || undefined;
-  const isChatCompletionsRequest = isChatCompletionsPath(pathname);
+  const requestKind = classifyRequestPath(pathname);
+  const isStreamingCapableRequest =
+    requestKind === "chat_completions" || requestKind === "responses";
 
   if (rawBody.byteLength === 0) {
     return {
@@ -351,6 +364,7 @@ async function prepareRequestBody(
       resolvedModel: defaultModel,
       bodyWasMutated: false,
       mimicStreamingForClient: false,
+      mimicStreamingFormat: null,
       includeUsageInStreaming: false,
       includeObfuscationInStreaming: false,
     };
@@ -364,6 +378,7 @@ async function prepareRequestBody(
       resolvedModel: defaultModel,
       bodyWasMutated: false,
       mimicStreamingForClient: false,
+      mimicStreamingFormat: null,
       includeUsageInStreaming: false,
       includeObfuscationInStreaming: false,
     };
@@ -379,6 +394,7 @@ async function prepareRequestBody(
       resolvedModel: defaultModel,
       bodyWasMutated: false,
       mimicStreamingForClient: false,
+      mimicStreamingFormat: null,
       includeUsageInStreaming: false,
       includeObfuscationInStreaming: false,
     };
@@ -389,10 +405,11 @@ async function prepareRequestBody(
   const includeObfuscationInStreaming =
     readIncludeObfuscationFromStreamOptions(parsed);
   const mimicStreamingForClient =
-    isChatCompletionsRequest &&
+    isStreamingCapableRequest &&
     provider.mimicStreaming &&
     !provider.disableStreaming &&
     streamRequested;
+  const mimicStreamingFormat = mimicStreamingForClient ? requestKind : null;
 
   const currentModel =
     typeof parsed.model === "string" ? parsed.model : undefined;
@@ -410,8 +427,7 @@ async function prepareRequestBody(
     updated = true;
   }
 
-  const disableStreaming =
-    provider.disableStreaming && isChatCompletionsRequest;
+  const disableStreaming = provider.disableStreaming && isStreamingCapableRequest;
   if (disableStreaming) {
     if (parsed.stream !== false) {
       parsed.stream = false;
@@ -451,6 +467,7 @@ async function prepareRequestBody(
       resolvedModel: resolvedModel || undefined,
       bodyWasMutated: false,
       mimicStreamingForClient,
+      mimicStreamingFormat,
       includeUsageInStreaming,
       includeObfuscationInStreaming,
     };
@@ -465,13 +482,25 @@ async function prepareRequestBody(
     resolvedModel: resolvedModel || undefined,
     bodyWasMutated: true,
     mimicStreamingForClient,
+    mimicStreamingFormat,
     includeUsageInStreaming,
     includeObfuscationInStreaming,
   };
 }
 
-function isChatCompletionsPath(pathname: string): boolean {
-  return pathname.toLowerCase().endsWith("/chat/completions");
+function classifyRequestPath(
+  pathname: string,
+): "chat_completions" | "responses" | null {
+  const normalizedPath = pathname.toLowerCase();
+  if (normalizedPath.endsWith("/chat/completions")) {
+    return "chat_completions";
+  }
+
+  if (normalizedPath.endsWith("/responses")) {
+    return "responses";
+  }
+
+  return null;
 }
 
 function readIncludeUsageFromStreamOptions(

@@ -2,6 +2,10 @@ import path from "node:path";
 import { parseArgs } from "util";
 import { Hono } from "hono";
 import { proxy } from "hono/proxy";
+import {
+  normalizeUpstreamHeadersForProvider,
+  resolveSourceAuthorizationHeader,
+} from "./auth-headers";
 import { maybeMimicAnthropicMessagesStreaming } from "./anthropic-messages-streaming";
 import { maybeMimicChatCompletionsStreaming } from "./chat-completions-streaming";
 import { maybeMimicResponsesStreaming } from "./responses-streaming";
@@ -155,9 +159,15 @@ app.all("*", async (c) => {
   );
 
   const incomingHeaders = new Headers(request.headers);
-  const originalAuth = incomingHeaders.get("authorization");
+  const originalAuth = resolveSourceAuthorizationHeader(
+    incomingHeaders,
+    providerMatch.provider.apiFormat,
+  );
 
-  const baseHeaders = new Headers(incomingHeaders);
+  const baseHeaders = normalizeUpstreamHeadersForProvider(
+    incomingHeaders,
+    providerMatch.provider.apiFormat,
+  );
   baseHeaders.delete("host");
   if (preparedBody.bodyWasMutated) {
     baseHeaders.set(

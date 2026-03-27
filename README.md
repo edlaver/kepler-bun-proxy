@@ -62,6 +62,9 @@ applies `stripRouteSegments` and sends the request to
   `/v1/chat/completions` and `/v1/responses` when the upstream returns JSON.
 - `mimicStreaming` can also synthesize Anthropic Messages SSE for
   `/v1/messages` when the Anthropic upstream returns a full JSON message.
+- Anthropic-format requests normalize client auth onto `Authorization`. If a
+  client sends `x-api-key`, the proxy converts it to `Authorization: Bearer ...`
+  for upstream requests and does not forward the original `x-api-key` header.
 
 ## Scripts
 

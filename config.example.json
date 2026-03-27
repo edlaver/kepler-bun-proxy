@@ -5,8 +5,8 @@
   "debugPath": "./logs",
   "providers": {
     "openai": {
-      "convertTokenFromHeader": ["authorization"],
       "routePrefix": "/openai",
+      "convertTokenFromHeader": ["authorization"],
       "upstreamTemplate-example": "https://your-gateway.com/genai/oai/{model}",
       "upstreamTemplate": "https://api.openai.com",
       "defaultModel": "gpt-5.1-2025-11-13",
@@ -22,8 +22,8 @@
       }
     },
     "anthropic": {
-      "convertTokenFromHeader": ["authorization", "x-api-key"],
       "routePrefix": "/anthropic",
+      "convertTokenFromHeader": ["authorization", "x-api-key"],
       "upstreamTemplate": "https://api.bedrock.com/{model}/v1",
       "upstreamTemplate-bedrock-example": "https://api.bedrock.com/{model}/v1",
       "defaultModel": "anthropic-claude-sonnet-4-6",

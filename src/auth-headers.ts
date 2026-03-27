@@ -1,24 +1,26 @@
 import type { ProviderApiFormat } from "./types";
 
-export function resolveSourceAuthorizationHeader(
+export function resolveTokenConversionAuthorizationHeader(
   headers: Headers,
-  apiFormat: ProviderApiFormat,
+  sourceHeaderNames: string[],
 ): string | null {
-  const authorization = normalizeHeaderValue(headers.get("authorization"));
-  if (authorization) {
-    return authorization;
+  for (const sourceHeaderName of sourceHeaderNames) {
+    const normalizedHeaderName = sourceHeaderName.trim().toLowerCase();
+    if (!normalizedHeaderName) {
+      continue;
+    }
+
+    const sourceValue = normalizeHeaderValue(headers.get(normalizedHeaderName));
+    if (!sourceValue) {
+      continue;
+    }
+
+    return normalizedHeaderName === "authorization"
+      ? sourceValue
+      : toBearerAuthorization(sourceValue);
   }
 
-  if (apiFormat !== "anthropic") {
-    return null;
-  }
-
-  const apiKey = normalizeHeaderValue(headers.get("x-api-key"));
-  if (!apiKey) {
-    return null;
-  }
-
-  return toBearerAuthorization(apiKey);
+  return null;
 }
 
 export function normalizeUpstreamHeadersForProvider(
@@ -31,7 +33,7 @@ export function normalizeUpstreamHeadersForProvider(
     return normalized;
   }
 
-  const authorization = resolveSourceAuthorizationHeader(normalized, apiFormat);
+  const authorization = resolveAnthropicUpstreamAuthorizationHeader(normalized);
   normalized.delete("x-api-key");
 
   if (authorization) {
@@ -46,6 +48,22 @@ export function normalizeUpstreamHeadersForProvider(
 function normalizeHeaderValue(value: string | null): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+}
+
+function resolveAnthropicUpstreamAuthorizationHeader(
+  headers: Headers,
+): string | null {
+  const authorization = normalizeHeaderValue(headers.get("authorization"));
+  if (authorization) {
+    return authorization;
+  }
+
+  const apiKey = normalizeHeaderValue(headers.get("x-api-key"));
+  if (!apiKey) {
+    return null;
+  }
+
+  return toBearerAuthorization(apiKey);
 }
 
 function toBearerAuthorization(value: string): string {

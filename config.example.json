@@ -5,6 +5,7 @@
   "debugPath": "./logs",
   "providers": {
     "openai": {
+      "convertTokenFromHeader": ["authorization"],
       "routePrefix": "/openai",
       "upstreamTemplate-example": "https://your-gateway.com/genai/oai/{model}",
       "upstreamTemplate": "https://api.openai.com",
@@ -21,6 +22,7 @@
       }
     },
     "anthropic": {
+      "convertTokenFromHeader": ["authorization", "x-api-key"],
       "routePrefix": "/anthropic",
       "upstreamTemplate": "https://api.bedrock.com/{model}/v1",
       "upstreamTemplate-bedrock-example": "https://api.bedrock.com/{model}/v1",

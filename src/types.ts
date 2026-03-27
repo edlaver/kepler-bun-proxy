@@ -2,6 +2,7 @@ export type ProviderApiFormat = "openai" | "anthropic";
 
 export interface ProviderConfig {
   apiFormat: ProviderApiFormat;
+  convertTokenFromHeader: string[];
   routePrefix: string;
   upstreamTemplate: string;
   defaultModel: string;

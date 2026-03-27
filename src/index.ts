@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import { proxy } from "hono/proxy";
 import {
   normalizeUpstreamHeadersForProvider,
-  resolveSourceAuthorizationHeader,
+  resolveTokenConversionAuthorizationHeader,
 } from "./auth-headers";
 import { maybeMimicAnthropicMessagesStreaming } from "./anthropic-messages-streaming";
 import { maybeMimicChatCompletionsStreaming } from "./chat-completions-streaming";
@@ -159,9 +159,9 @@ app.all("*", async (c) => {
   );
 
   const incomingHeaders = new Headers(request.headers);
-  const originalAuth = resolveSourceAuthorizationHeader(
+  const originalAuth = resolveTokenConversionAuthorizationHeader(
     incomingHeaders,
-    providerMatch.provider.apiFormat,
+    providerMatch.provider.convertTokenFromHeader,
   );
 
   const baseHeaders = normalizeUpstreamHeadersForProvider(

@@ -1,37 +1,46 @@
 import { describe, expect, test } from "bun:test";
 import {
   normalizeUpstreamHeadersForProvider,
-  resolveSourceAuthorizationHeader,
+  resolveTokenConversionAuthorizationHeader,
 } from "./auth-headers";
 
-describe("resolveSourceAuthorizationHeader", () => {
-  test("uses Authorization as-is when present", () => {
+describe("resolveTokenConversionAuthorizationHeader", () => {
+  test("uses Authorization as-is when configured", () => {
     const headers = new Headers({
       authorization: "Bearer converted-token",
       "x-api-key": "source-token",
     });
 
-    expect(resolveSourceAuthorizationHeader(headers, "anthropic")).toBe(
-      "Bearer converted-token",
-    );
+    expect(
+      resolveTokenConversionAuthorizationHeader(headers, ["authorization"]),
+    ).toBe("Bearer converted-token");
   });
 
-  test("maps Anthropic x-api-key to Bearer authorization", () => {
+  test("supports nonstandard auth headers and x-api-key in priority order", () => {
+    const headers = new Headers({
+      authentication: "raw-authentication-token",
+      "x-api-key": "source-token",
+    });
+
+    expect(
+      resolveTokenConversionAuthorizationHeader(headers, [
+        "authentication",
+        "x-api-key",
+      ]),
+    ).toBe("Bearer raw-authentication-token");
+  });
+
+  test("falls back to x-api-key when earlier configured headers are absent", () => {
     const headers = new Headers({
       "x-api-key": "source-token",
     });
 
-    expect(resolveSourceAuthorizationHeader(headers, "anthropic")).toBe(
-      "Bearer source-token",
-    );
-  });
-
-  test("ignores x-api-key for OpenAI providers", () => {
-    const headers = new Headers({
-      "x-api-key": "source-token",
-    });
-
-    expect(resolveSourceAuthorizationHeader(headers, "openai")).toBeNull();
+    expect(
+      resolveTokenConversionAuthorizationHeader(headers, [
+        "authentication",
+        "x-api-key",
+      ]),
+    ).toBe("Bearer source-token");
   });
 });
 

@@ -34,8 +34,13 @@ Config is a single, top-level object (no `Proxy` wrapper). Key highlights:
 - `debugPath` (string, optional; used only when `--debug`/`-d` is provided)
 - `providers` (record of providers)
 - Provider settings include `routePrefix`, `upstreamTemplate`, `defaultModel`,
-  `modelAliases`, `disableStreaming`, `mimicStreaming`, `tokenLimitPerMinute`,
-  `stripRequestProperties`, and `stripRouteSegments`.
+  `modelAliases`, `convertTokenFromHeader`, `disableStreaming`,
+  `mimicStreaming`, `tokenLimitPerMinute`, `stripRequestProperties`, and
+  `stripRouteSegments`.
+- `convertTokenFromHeader` is an ordered array of request header names used to
+  source the token for `convertToken`. Defaults are `["authorization"]` for
+  OpenAI-format providers and `["authorization", 
+"x-api-key"]` for Anthropic.
 - `stripRouteSegments` removes matching path suffixes from the final upstream URL
   before the request is sent. Example: `["/messages"]` rewrites
   `.../v1/messages` to `.../v1`.
@@ -45,6 +50,7 @@ Config is a single, top-level object (no `Proxy` wrapper). Key highlights:
 {
   "providers": {
     "anthropic": {
+      "convertTokenFromHeader": ["authorization", "x-api-key"],
       "routePrefix": "/anthropic",
       "upstreamTemplate": "https://api.bedrock.com/{model}/v1",
       "defaultModel": "anthropic-claude-sonnet-4-6",
@@ -58,6 +64,7 @@ If the proxy receives a request for `/anthropic/v1/messages`, it first maps that
 to `https://api.bedrock.com/anthropic-claude-sonnet-4-6/v1/messages`, then
 applies `stripRouteSegments` and sends the request to
 `https://api.bedrock.com/anthropic-claude-sonnet-4-6/v1`.
+
 - `mimicStreaming` can synthesize OpenAI-compatible SSE responses for both
   `/v1/chat/completions` and `/v1/responses` when the upstream returns JSON.
 - `mimicStreaming` can also synthesize Anthropic Messages SSE for

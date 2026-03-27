@@ -16,7 +16,13 @@ const providerModelSchema = z.object({
   modelAlias: z.string().optional().default(""),
 });
 
+const providerHeaderListSchema = z
+  .union([z.string(), z.array(z.string())])
+  .optional()
+  .default([]);
+
 const providerSchema = z.object({
+  convertTokenFromHeader: providerHeaderListSchema,
   routePrefix: z.string().default(""),
   upstreamTemplate: z.string().default(""),
   defaultModel: z.string().default(""),
@@ -71,6 +77,7 @@ function mapProxyConfig(source: z.infer<typeof proxySchema>): ProxyConfig {
       continue;
     }
 
+    const apiFormat = inferProviderApiFormat(providerName);
     const models: Record<string, ProviderModelConfig> = {};
     const modelAliasLookup: Record<string, string> = {};
     for (const [modelNameRaw, modelConfig] of Object.entries(provider.models)) {
@@ -93,7 +100,11 @@ function mapProxyConfig(source: z.infer<typeof proxySchema>): ProxyConfig {
     }
 
     providers[providerName] = {
-      apiFormat: inferProviderApiFormat(providerName),
+      apiFormat,
+      convertTokenFromHeader: normalizeHeaderList(
+        provider.convertTokenFromHeader,
+        apiFormat,
+      ),
       routePrefix: normalizeRoutePrefix(provider.routePrefix),
       upstreamTemplate: provider.upstreamTemplate.trim(),
       defaultModel: provider.defaultModel.trim(),
@@ -126,6 +137,34 @@ function inferProviderApiFormat(providerName: string): ProviderApiFormat {
   return providerName.trim().toLowerCase() === "anthropic"
     ? "anthropic"
     : "openai";
+}
+
+function normalizeHeaderList(
+  source: string | string[],
+  apiFormat: ProviderApiFormat,
+): string[] {
+  const rawValues = Array.isArray(source) ? source : [source];
+  const normalized = Array.from(
+    new Set(
+      rawValues
+        .map((value) => value.trim().toLowerCase())
+        .filter((value) => value.length > 0),
+    ),
+  );
+
+  if (normalized.length > 0) {
+    return normalized;
+  }
+
+  return defaultConvertTokenFromHeaders(apiFormat);
+}
+
+function defaultConvertTokenFromHeaders(
+  apiFormat: ProviderApiFormat,
+): string[] {
+  return apiFormat === "anthropic"
+    ? ["authorization", "authentication", "x-api-key"]
+    : ["authorization"];
 }
 
 function normalizeRoutePrefix(prefix: string): string {

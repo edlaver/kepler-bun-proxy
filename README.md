@@ -1,6 +1,6 @@
 # kepler-bun-proxy
 
-TypeScript/Bun/Hono reverse proxy that forwards standard OpenAI requests to the Kepler AI API gateway provider in the expected URL format, with token handling, rate limiting, and optional debug logging.
+TypeScript/Bun/Hono reverse proxy that forwards OpenAI-compatible and Anthropic Messages API requests to upstream providers, with token handling, rate limiting, and optional debug logging.
 
 ## Run
 
@@ -38,6 +38,8 @@ Config is a single, top-level object (no `Proxy` wrapper). Key highlights:
   and `stripRequestProperties`.
 - `mimicStreaming` can synthesize OpenAI-compatible SSE responses for both
   `/v1/chat/completions` and `/v1/responses` when the upstream returns JSON.
+- `mimicStreaming` can also synthesize Anthropic Messages SSE for
+  `/v1/messages` when the Anthropic upstream returns a full JSON message.
 
 ## Scripts
 

@@ -18,6 +18,24 @@
           "modelAlias": "gpt-5.1"
         }
       }
+    },
+    "anthropic": {
+      "routePrefix": "/anthropic",
+      "upstreamTemplate": "https://api.bedrock.com/{model}/v1",
+      "upstreamTemplate-bedrock-example": "https://api.bedrock.com/{model}/v1",
+      "defaultModel": "anthropic-claude-sonnet-4-6",
+      "disableStreaming": false,
+      "mimicStreaming": true,
+      "tokenLimitPerMinute": 200000,
+      "stripRequestProperties": [],
+      "models": {
+        "anthropic-claude-sonnet-4-6": {
+          "modelAlias": "sonnet-4.6"
+        },
+        "anthropic-claude-opus-4-6": {
+          "modelAlias": "opus-4.6"
+        }
+      }
     }
   }
 }

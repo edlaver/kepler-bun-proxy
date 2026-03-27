@@ -2,6 +2,7 @@ import path from "node:path";
 import { parseArgs } from "util";
 import { Hono } from "hono";
 import { proxy } from "hono/proxy";
+import { maybeMimicAnthropicMessagesStreaming } from "./anthropic-messages-streaming";
 import { maybeMimicChatCompletionsStreaming } from "./chat-completions-streaming";
 import { maybeMimicResponsesStreaming } from "./responses-streaming";
 import { ConfigStore } from "./config-store";
@@ -26,7 +27,11 @@ interface PreparedRequestBody {
   resolvedModel: string | undefined;
   bodyWasMutated: boolean;
   mimicStreamingForClient: boolean;
-  mimicStreamingFormat: "chat_completions" | "responses" | null;
+  mimicStreamingFormat:
+    | "chat_completions"
+    | "responses"
+    | "anthropic_messages"
+    | null;
   includeUsageInStreaming: boolean;
   includeObfuscationInStreaming: boolean;
 }
@@ -230,6 +235,11 @@ app.all("*", async (c) => {
         preparedBody.mimicStreamingForClient,
         preparedBody.includeObfuscationInStreaming,
       );
+    } else if (preparedBody.mimicStreamingFormat === "anthropic_messages") {
+      finalResponse = await maybeMimicAnthropicMessagesStreaming(
+        enrichedResponse,
+        preparedBody.mimicStreamingForClient,
+      );
     }
 
     if (!debugLogger.isEnabled()) {
@@ -353,9 +363,11 @@ async function prepareRequestBody(
 ): Promise<PreparedRequestBody> {
   const rawBody = new Uint8Array(await request.arrayBuffer());
   const defaultModel = provider.defaultModel || undefined;
-  const requestKind = classifyRequestPath(pathname);
+  const requestKind = classifyRequestPath(pathname, provider.apiFormat);
   const isStreamingCapableRequest =
-    requestKind === "chat_completions" || requestKind === "responses";
+    requestKind === "chat_completions" ||
+    requestKind === "responses" ||
+    requestKind === "anthropic_messages";
 
   if (rawBody.byteLength === 0) {
     return {
@@ -401,9 +413,14 @@ async function prepareRequestBody(
   }
 
   const streamRequested = parsed.stream === true;
-  const includeUsageInStreaming = readIncludeUsageFromStreamOptions(parsed);
+  const includeUsageInStreaming =
+    requestKind === "chat_completions"
+      ? readIncludeUsageFromStreamOptions(parsed)
+      : false;
   const includeObfuscationInStreaming =
-    readIncludeObfuscationFromStreamOptions(parsed);
+    requestKind === "chat_completions" || requestKind === "responses"
+      ? readIncludeObfuscationFromStreamOptions(parsed)
+      : false;
   const mimicStreamingForClient =
     isStreamingCapableRequest &&
     provider.mimicStreaming &&
@@ -433,7 +450,10 @@ async function prepareRequestBody(
       parsed.stream = false;
       updated = true;
     }
-    if (Object.prototype.hasOwnProperty.call(parsed, "stream_options")) {
+    if (
+      provider.apiFormat === "openai" &&
+      Object.prototype.hasOwnProperty.call(parsed, "stream_options")
+    ) {
       delete parsed.stream_options;
       updated = true;
     }
@@ -444,7 +464,10 @@ async function prepareRequestBody(
       parsed.stream = false;
       updated = true;
     }
-    if (Object.prototype.hasOwnProperty.call(parsed, "stream_options")) {
+    if (
+      provider.apiFormat === "openai" &&
+      Object.prototype.hasOwnProperty.call(parsed, "stream_options")
+    ) {
       delete parsed.stream_options;
       updated = true;
     }
@@ -490,8 +513,17 @@ async function prepareRequestBody(
 
 function classifyRequestPath(
   pathname: string,
-): "chat_completions" | "responses" | null {
+  apiFormat: ProviderConfig["apiFormat"],
+): "chat_completions" | "responses" | "anthropic_messages" | null {
   const normalizedPath = pathname.toLowerCase();
+  if (apiFormat === "anthropic") {
+    if (normalizedPath.endsWith("/messages")) {
+      return "anthropic_messages";
+    }
+
+    return null;
+  }
+
   if (normalizedPath.endsWith("/chat/completions")) {
     return "chat_completions";
   }
@@ -580,12 +612,17 @@ function joinPath(basePath: string, suffixPath: string): string {
     return normalizePath(basePath);
   }
 
-  const normalizedBase = normalizePath(basePath).replace(/\/+$/g, "");
-  const normalizedSuffix = suffixPath.startsWith("/")
-    ? suffixPath
-    : `/${suffixPath}`;
+  const baseSegments = splitPathSegments(basePath);
+  const suffixSegments = splitPathSegments(suffixPath);
+  const overlap = findPathOverlap(baseSegments, suffixSegments);
+  const combinedSegments = [
+    ...baseSegments,
+    ...suffixSegments.slice(overlap),
+  ];
 
-  return `${normalizedBase}${normalizedSuffix}`.replace(/\/{2,}/g, "/");
+  return combinedSegments.length > 0
+    ? `/${combinedSegments.join("/")}`
+    : "/";
 }
 
 function buildModelList(provider: ProviderConfig): string[] {
@@ -615,6 +652,34 @@ function normalizePath(value: string): string {
   }
 
   return value.startsWith("/") ? value : `/${value}`;
+}
+
+function splitPathSegments(value: string): string[] {
+  return value.split("/").filter((segment) => segment.length > 0);
+}
+
+function findPathOverlap(baseSegments: string[], suffixSegments: string[]): number {
+  const maxOverlap = Math.min(baseSegments.length, suffixSegments.length);
+
+  for (let overlap = maxOverlap; overlap > 0; overlap -= 1) {
+    let matches = true;
+
+    for (let index = 0; index < overlap; index += 1) {
+      if (
+        baseSegments[baseSegments.length - overlap + index] !==
+        suffixSegments[index]
+      ) {
+        matches = false;
+        break;
+      }
+    }
+
+    if (matches) {
+      return overlap;
+    }
+  }
+
+  return 0;
 }
 
 function shouldIncludeBody(method: string, body: Uint8Array): boolean {

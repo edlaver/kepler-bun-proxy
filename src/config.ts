@@ -3,6 +3,7 @@ import path from "node:path";
 import { z } from "zod";
 import type {
   AppConfig,
+  ProviderApiFormat,
   ProviderConfig,
   ProviderModelConfig,
   ProxyConfig,
@@ -91,6 +92,7 @@ function mapProxyConfig(source: z.infer<typeof proxySchema>): ProxyConfig {
     }
 
     providers[providerName] = {
+      apiFormat: inferProviderApiFormat(providerName),
       routePrefix: normalizeRoutePrefix(provider.routePrefix),
       upstreamTemplate: provider.upstreamTemplate.trim(),
       defaultModel: provider.defaultModel.trim(),
@@ -114,6 +116,12 @@ function mapProxyConfig(source: z.infer<typeof proxySchema>): ProxyConfig {
     debugPath: debugPath && debugPath.length > 0 ? debugPath : undefined,
     providers,
   };
+}
+
+function inferProviderApiFormat(providerName: string): ProviderApiFormat {
+  return providerName.trim().toLowerCase() === "anthropic"
+    ? "anthropic"
+    : "openai";
 }
 
 function normalizeRoutePrefix(prefix: string): string {

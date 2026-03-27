@@ -1,4 +1,7 @@
+export type ProviderApiFormat = "openai" | "anthropic";
+
 export interface ProviderConfig {
+  apiFormat: ProviderApiFormat;
   routePrefix: string;
   upstreamTemplate: string;
   defaultModel: string;

@@ -15,6 +15,7 @@ import {
 } from "./token-rate-limiter";
 import { TokenService } from "./token-service";
 import type { ProviderConfig } from "./types";
+import { buildUpstreamUrl } from "./upstream-url";
 
 interface ProviderMatch {
   name: string;
@@ -150,6 +151,7 @@ app.all("*", async (c) => {
     requestUrl.pathname,
     providerMatch.provider.routePrefix,
     requestUrl.search,
+    providerMatch.provider.stripRouteSegments,
   );
 
   const incomingHeaders = new Headers(request.headers);
@@ -581,19 +583,6 @@ function safeParseJsonObject(value: string): Record<string, unknown> | null {
   }
 }
 
-function buildUpstreamUrl(
-  destinationPrefix: string,
-  incomingPathname: string,
-  routePrefix: string,
-  search: string,
-): string {
-  const destination = new URL(destinationPrefix);
-  const pathWithoutPrefix = removePrefix(incomingPathname, routePrefix);
-  destination.pathname = joinPath(destination.pathname, pathWithoutPrefix);
-  destination.search = search;
-  return destination.toString();
-}
-
 function removePrefix(pathname: string, prefix: string): string {
   if (!pathname.toLowerCase().startsWith(prefix.toLowerCase())) {
     return pathname;
@@ -605,24 +594,6 @@ function removePrefix(pathname: string, prefix: string): string {
   }
 
   return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
-}
-
-function joinPath(basePath: string, suffixPath: string): string {
-  if (!suffixPath || suffixPath === "/") {
-    return normalizePath(basePath);
-  }
-
-  const baseSegments = splitPathSegments(basePath);
-  const suffixSegments = splitPathSegments(suffixPath);
-  const overlap = findPathOverlap(baseSegments, suffixSegments);
-  const combinedSegments = [
-    ...baseSegments,
-    ...suffixSegments.slice(overlap),
-  ];
-
-  return combinedSegments.length > 0
-    ? `/${combinedSegments.join("/")}`
-    : "/";
 }
 
 function buildModelList(provider: ProviderConfig): string[] {
@@ -644,42 +615,6 @@ function buildModelList(provider: ProviderConfig): string[] {
   }
 
   return items;
-}
-
-function normalizePath(value: string): string {
-  if (!value) {
-    return "/";
-  }
-
-  return value.startsWith("/") ? value : `/${value}`;
-}
-
-function splitPathSegments(value: string): string[] {
-  return value.split("/").filter((segment) => segment.length > 0);
-}
-
-function findPathOverlap(baseSegments: string[], suffixSegments: string[]): number {
-  const maxOverlap = Math.min(baseSegments.length, suffixSegments.length);
-
-  for (let overlap = maxOverlap; overlap > 0; overlap -= 1) {
-    let matches = true;
-
-    for (let index = 0; index < overlap; index += 1) {
-      if (
-        baseSegments[baseSegments.length - overlap + index] !==
-        suffixSegments[index]
-      ) {
-        matches = false;
-        break;
-      }
-    }
-
-    if (matches) {
-      return overlap;
-    }
-  }
-
-  return 0;
 }
 
 function shouldIncludeBody(method: string, body: Uint8Array): boolean {

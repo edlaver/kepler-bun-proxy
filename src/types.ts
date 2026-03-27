@@ -10,6 +10,7 @@ export interface ProviderConfig {
   disableStreaming: boolean;
   mimicStreaming: boolean;
   stripRequestProperties: string[];
+  stripRouteSegments: string[];
   tokenLimitPerMinute: number;
 }
 

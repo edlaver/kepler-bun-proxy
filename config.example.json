@@ -13,6 +13,7 @@
       "mimicStreaming": false,
       "tokenLimitPerMinute": 200000,
       "stripRequestProperties": ["max_tokens"],
+      "stripRouteSegments": [],
       "models": {
         "gpt-5.1-2025-11-13": {
           "modelAlias": "gpt-5.1"
@@ -28,6 +29,7 @@
       "mimicStreaming": true,
       "tokenLimitPerMinute": 200000,
       "stripRequestProperties": [],
+      "stripRouteSegments": ["/messages"],
       "models": {
         "anthropic-claude-sonnet-4-6": {
           "modelAlias": "sonnet-4.6"

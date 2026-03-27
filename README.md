@@ -35,7 +35,29 @@ Config is a single, top-level object (no `Proxy` wrapper). Key highlights:
 - `providers` (record of providers)
 - Provider settings include `routePrefix`, `upstreamTemplate`, `defaultModel`,
   `modelAliases`, `disableStreaming`, `mimicStreaming`, `tokenLimitPerMinute`,
-  and `stripRequestProperties`.
+  `stripRequestProperties`, and `stripRouteSegments`.
+- `stripRouteSegments` removes matching path suffixes from the final upstream URL
+  before the request is sent. Example: `["/messages"]` rewrites
+  `.../v1/messages` to `.../v1`.
+- Anthropic/Bedrock example:
+
+```json
+{
+  "providers": {
+    "anthropic": {
+      "routePrefix": "/anthropic",
+      "upstreamTemplate": "https://api.bedrock.com/{model}/v1",
+      "defaultModel": "anthropic-claude-sonnet-4-6",
+      "stripRouteSegments": ["/messages"]
+    }
+  }
+}
+```
+
+If the proxy receives a request for `/anthropic/v1/messages`, it first maps that
+to `https://api.bedrock.com/anthropic-claude-sonnet-4-6/v1/messages`, then
+applies `stripRouteSegments` and sends the request to
+`https://api.bedrock.com/anthropic-claude-sonnet-4-6/v1`.
 - `mimicStreaming` can synthesize OpenAI-compatible SSE responses for both
   `/v1/chat/completions` and `/v1/responses` when the upstream returns JSON.
 - `mimicStreaming` can also synthesize Anthropic Messages SSE for

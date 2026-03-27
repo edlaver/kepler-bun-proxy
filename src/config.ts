@@ -24,6 +24,7 @@ const providerSchema = z.object({
   disableStreaming: z.boolean().default(false),
   mimicStreaming: z.boolean().default(false),
   stripRequestProperties: z.array(z.string()).default([]),
+  stripRouteSegments: z.array(z.string()).default([]),
   tokenLimitPerMinute: z.number().int().nonnegative().default(0),
 });
 
@@ -103,6 +104,9 @@ function mapProxyConfig(source: z.infer<typeof proxySchema>): ProxyConfig {
       stripRequestProperties: provider.stripRequestProperties
         .map((property) => property.trim())
         .filter((property) => property.length > 0),
+      stripRouteSegments: provider.stripRouteSegments
+        .map((segment) => segment.trim())
+        .filter((segment) => segment.length > 0),
       tokenLimitPerMinute: provider.tokenLimitPerMinute,
     };
   }
